@@ -92,10 +92,18 @@ o_rg = ont.nodes.new("ShaderNodeMath")
 o_rg.operation = "GREATER_THAN"
 o_rg.inputs[1].default_value = 0.3
 ont.links.new(o_fr.outputs[0], o_rg.inputs[0])
+o_face = ont.nodes.new("ShaderNodeMath")
+o_face.operation = "GREATER_THAN"
+o_face.inputs[1].default_value = 0.55
+ont.links.new(o_abs.outputs[0], o_face.inputs[0])
+o_rg2 = ont.nodes.new("ShaderNodeMath")
+o_rg2.operation = "MAXIMUM"
+ont.links.new(o_rg.outputs[0], o_rg2.inputs[0])
+ont.links.new(o_face.outputs[0], o_rg2.inputs[1])
 o_hide3 = ont.nodes.new("ShaderNodeMath")
 o_hide3.operation = "MAXIMUM"
 ont.links.new(o_hide2.outputs[0], o_hide3.inputs[0])
-ont.links.new(o_rg.outputs[0], o_hide3.inputs[1])
+ont.links.new(o_rg2.outputs[0], o_hide3.inputs[1])
 ont.links.new(o_hide3.outputs[0], o_mx.inputs[0])
 ` : 'ont.links.new(o_hide2.outputs[0], o_mx.inputs[0])\n'}for prop, val in (("use_transparent_shadow", True), ("shadow_method", "NONE")):
     try:

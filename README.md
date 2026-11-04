@@ -7,14 +7,34 @@ material, with the same look, the same parameters and a live link between them a
 
 ![Inoscula Studio](docs/studio-lit.png)
 
+## Impasto, in a few palettes
+
+Thick, directional oil strokes that follow every form, in two or three painted tones. The colour shifts with the
+light rather than just getting darker, and loose outlines can float around each shape.
+
+| | |
+|---|---|
+| ![Pink and green, three tones, painted backdrop](docs/beauty/impasto-pg-trio-painted.png) | ![Red, blue and black with yellow floating outlines, painted backdrop](docs/beauty/impasto-rbk-painted.png) |
+| Pink and green, three tones, on a painted backdrop in the inverted palette | Red, blue and black with yellow floating outlines |
+| ![Pink and green, two tones, plain backdrop](docs/beauty/impasto-pg-duo-solid.png) | ![Cobalt and tangerine, plain backdrop](docs/beauty/impasto-cobalt-solid.png) |
+| Pink and green, two tones, on a dim plain backdrop | Cobalt and tangerine, three tones |
+| ![Red, blue and black under realistic light](docs/beauty/impasto-rbk-real.png) | ![Pink and green under realistic light](docs/beauty/impasto-pg-trio-real.png) |
+| Lit mostly by the renderer: real shadows across the paint | The same with the pink and green palette |
+
+### Under different lighting
+
+![Impasto under hero, Rembrandt, chiaroscuro, top and rim light](docs/beauty/impasto-lighting.png)
+
+Hero, Rembrandt, chiaroscuro, top and rim light. The palettes are in `palettes/`.
+
 ## What you can make
 
 - **Stylised looks that match to the pixel.** Unlit shaders compute the same colour in every tool: comic
-  print, painted light bands, hard ink reflections, claymation, felt, knit, crochet, paper, engraving.
-- **Realistic materials, lit by each tool's own renderer.** Lit shaders output base colour, roughness,
-  metallic, bumps and emission, plus coat, sheen and subsurface layers. Blender lights them with the Principled
-  BSDF, Unreal with Default Lit or a Substrate Slab, Godot and Unity with their standard lit models, RICO with
-  three.js's physical material. Dust, scratches, chipped paint, grime, flakes, moss, stains.
+  print, painted light bands, hard ink reflections, claymation, engraving, and a set of painterly looks.
+- **Lit materials, lit by each tool's own renderer.** Lit shaders output base colour, roughness, metallic,
+  bumps and emission, plus coat, sheen and subsurface layers. Blender lights them with the Principled BSDF,
+  Unreal with Default Lit or a Substrate Slab, Godot and Unity with their standard lit models, RICO with
+  three.js's physical material.
 - **Adapts to the object.** `object_size` tells a shader how big the object is, so painterly looks keep the
   same number of strokes on a pebble and on a building; strokes follow each form as the eye sees it and read
   the model's curvature and crevices. RICO: `look.fitTo(obj)`; the Blender export and the Godot light bridge
@@ -33,6 +53,21 @@ material, with the same look, the same parameters and a live link between them a
 - **Animated.** Any parameter can be keyframed in each tool (Blender keyframes, Unreal Sequencer, Godot
   AnimationPlayer). `time` drives motion inside the shader, and `floor(time * 12.0)` gives stop-motion
   stepping on twos.
+
+## Every program's own nodes
+
+![The same shader as Blender, Godot, Unreal and Unity nodes](docs/nodes-four.png)
+
+The Nodes view shows a shader the way each program shows it. Pick Blender and you see the Shader Editor nodes the
+Blender export builds, socket for socket (and one level up, the material around the group). Pick Godot and you see
+the VisualShader the Godot tab saves as a `.tres`. Unreal shows native material expressions, Unity the Shader
+Graph nodes. Maths become each program's own maths nodes one for one; Blender's noise, Voronoi and colour ramps,
+which no other program has, become one small code node each that runs Blender's own maths, so the pattern is
+the same everywhere. Zoom with the wheel, drag to move around, Fit to see it all.
+
+The Code view does the same for code: the Inoscula source, the Blender script, the Godot `.tres` or
+`.gdshader`, the Unreal script (native nodes, one Custom node or a Material Function) and the Unity Custom
+Function file, ready to copy, save or send over the live link.
 
 ## Three ways in
 
@@ -58,36 +93,54 @@ back, rebuild in Unreal. Changes made inside Unreal's Custom node code are the o
 
 ## Live link
 
-`node bin/inoscula-live.ts` connects everything that is open. Move a slider in Inoscula Studio or Blender and the
-same material changes in Blender, Godot, Unreal (Remote Control API), RICO (OSC, `/inoscula/<shader>/<parameter>`)
-and the Studio at once. Install `importers/inoscula_live_blender.py` as a Blender add-on and add
-`importers/inoscula_live.gd` to a Godot scene.
+Move a slider in one program and the same material changes in all the others. To set it up:
+
+1. Start the bridge on your computer, in the inoscula folder: `node bin/inoscula-live.ts`. It listens on 9420
+   (Inoscula Studio and web pages), 9421 (Blender), 9422 (Godot) and sends OSC on 9000.
+2. **Blender:** build the material (Blender tab, Run Script), then Edit, Preferences, Add-ons, Install from
+   Disk, `importers/inoscula_live_blender.py`, and tick it.
+3. **Godot:** use the Godot export as a ShaderMaterial and add `importers/inoscula_live.gd` to any node.
+4. **Unreal:** turn on the Remote Control API plugin, make a Material Instance, and start the bridge with
+   `--unreal http://localhost:30010 --unreal-instance /Game/Inoscula/MI_[Name]`.
+5. **RICO Engine, or anything that speaks OSC:** receives `/inoscula/[shader]/[parameter]` on port 9000.
+6. **Inoscula Studio:** open `dist/inoscula-studio.html` from your computer, press Live link, then Connect.
+
+Parameters match by their labels, so keep the shader's name the same in every program.
 
 ## Inoscula Studio
 
 `dist/inoscula-studio.html` is the whole tool in one file. Open it in a browser, with no install and no internet:
 
+- The preview and the parameters side by side at the top, always in view; the code and nodes underneath.
+  Drag the splits to resize, or swap the parameters and the shader panel.
 - Code editor with highlighting, errors that name the line, your own functions and a reference card.
-- Node view of the same shader; double-click a node to jump to its code.
+- Code and node views for each program (see above); double-click an Inoscula node to jump to its code.
 - Live preview on a sphere, knot, puppet, rounded box or **your own model** (.glb, .gltf, .obj).
 - **Prepare model** measures curvature and occlusion and stores them in the model; **Save model** writes a
   .glb with that data for every other tool.
 - Preview profiles that copy each tool's defaults (Blender AgX, Unreal filmic, Godot linear, Unity neutral),
   three light setups, a floor with soft shadows.
-- Sliders for every parameter, with an animate button that swings a value between its limits.
-- Exports for every tool, with Unreal as a Material or a Material Function (to plug into your own materials,
-  layer stacks or Substrate graphs), optionally ending in a Substrate Slab.
+- Sliders and buttons for every parameter: Off to switch one off and back, animate to swing it between its
+  limits, and buttons for counts such as light bands or tones.
+- Outline controls with the parameters: on or off, solid, broken or inked, and up to four floating lines.
+- **Save as look** keeps your edited shader in the look list under its own name.
+- **Kitbash:** mix any look into the one you are editing, in patches, in the light, in shadow, on top, at the
+  edges or in crevices. Its parameters come along with their own sliders, so you can keep stacking looks.
+- **Add to the scene:** stand other objects around yours, each with its own look, to see how looks sit next to,
+  in front of and behind each other under the same light.
+- Exports for every tool, with Unreal as native nodes, one Custom node or a Material Function (to plug into
+  your own materials, layer stacks or Substrate graphs), optionally ending in a Substrate Slab.
 - "How it travels" notes for each tool: what is the same, what is close, what that tool does not have.
 
 ## Render check: what it really looks like in each tool
 
-![Render check](docs/check-paint-bands.png)
+![Render check: Impasto in RICO, Blender and Godot](docs/check-impasto.png)
 
-`node bin/inoscula-check.ts looks/paint-bands.inoscula --godot path/to/godot` renders the shader in RICO,
-in real Blender and in real Godot, in one test scene (same camera, sun, sky and AgX tonemapping), and saves the
-pictures side by side. It shows what the shader really looks like in each program.
+`node bin/inoscula-check.ts looks/oil-paint.inoscula --godot path/to/godot` renders the shader in RICO, in
+real Blender (Cycles) and in real Godot, in one test scene (same camera, sun, sky and AgX tonemapping), and saves
+the pictures side by side. These are real renders from each program, not previews.
 
-![Render check, realistic](docs/check-dusty-metal.png)
+![Render check: Paint Bands in RICO, Blender and Godot](docs/check-paint-bands.png)
 
 ## How exact it is
 
@@ -96,18 +149,18 @@ inputs on both sides (Blender records the exact position, normal and UV it used 
 
 | Shader | Identical 8-bit colour |
 |---|---|
-| Ink Wash, Kitchen Sink, Claymation, Crochet, Knit, Puppet Felt, RICO Iridescent | 100% |
+| Ink Wash, Kitchen Sink, Claymation, RICO Iridescent | 100% |
 | Voronoi (distance, cell colour, position) | 100%, zero difference |
 | Grain Gradient | 99.96% |
 | Toon Bands, Comic Print, Engraving | 96 to 97%, and 99.98 to 100% within 2/255 |
 
-As Godot 4.5 draws them: 99.85 to 100% within 2/255 for every look except Engraving (98%). A material built by
+As Godot 4.5 draws them: 99.85 to 100% within 2/255 for every look except Engraving (98%). Godot's
+VisualShader (the node version) draws every look the same as Godot's code version, to within 1/255 for
+looks that hold still. A material built by
 hand in Blender, imported and run in RICO: 99.9% identical. Noise, White Noise and Voronoi are ports of
 Blender's own code, including its integer hashes, and colour ramps reproduce Blender's 257 entry lookup table.
 
 ## The look library
-
-![The look library](docs/library.png)
 
 | Look | What it does | Kind |
 |---|---|---|
@@ -119,23 +172,14 @@ Blender's own code, including its integer hashes, and colour ramps reproduce Ble
 | Painted Planes | Each stroke tilts the normal its own way (painterly normals), the light picks from a base colour and three accents, highlights in a palette colour | Painterly |
 | Paint With Light | White light turns into colour through a painted spectrum; stroke scale, rotation, complexity and crunchiness | Painterly |
 | Painted Character | Light split into highlight, midtone and shadow masks, each filled with its own brush and broken at its edge by it | Painterly |
-| Brush Paint | Painted 3D: facets from the normals, softened with noise, oriented brush strokes, four colour ramp, impasto, a broken ink outline, strokes that re-paint | Painterly |
 | Paint Bands | Sunlight in flat painted bands with directional brush strokes, sky light, painted shadow shapes, rim, ink outline on twos | Stylised |
 | Hard Reflections | Black and white glass or chrome: hard hotspots from fake lights, hard rim, scribbles | Stylised |
 | Comic Print | Halftone dots, hatching, off-register ink, boiling outline | Stylised |
 | Mono Ink | Black ink masses, dry brush, wobbling brush outline | Stylised |
-| Ink City | Pen contours and pencil hatching, redrawn every few frames | Stylised |
 | Engraving | Cross-hatching whose weight follows the light | Stylised |
 | Grain Gradient | Flat colour bands with a speckled, grainy blend | Stylised |
 | RICO Iridescent | Chromatic glass: rainbow bands on the edges, sheen, hot rim, grain | Stylised |
-| Claymation | Plasticine with thumbprints, kneading streaks and a waxy shine | Craft |
-| Puppet Felt | Matted felt with fuzz on the silhouette | Craft |
-| Knit | Stockinette stitches, yarn twist, stripes | Craft |
-| Crochet | Rows of round stitches around small holes | Craft |
-| Paper Town | Washi paper, woodblock colour, ink bands, folds | Craft |
-| Dusty Metal | Brushed steel, chipped paint, grime, dust, scratches | Realistic |
-| Worn Car Paint | Metal flake under clear coat, swirls, stone chips, road dust | Realistic |
-| Aged Concrete | Pits, rain stains, moss, damp line | Realistic |
+| Claymation | Modelling clay, lit: real fingerprint ridges that loop around a core, pressed in two overlapping layers, marbled second colour, dragged tool scrapes and thumb dents, grime in creases, a soft waxy sheen with subsurface glow, and handling that shifts between frames | Craft, lit |
 
 ## Quick start
 
@@ -143,7 +187,7 @@ Needs Node 22.18 or newer. No packages to install for the converter.
 
 ```
 node bin/inoscula.ts examples/ink.inoscula.json --out out          # every target, from a graph
-node bin/inoscula-check.ts looks/dusty-metal.inoscula --godot godot # real renders side by side
+node bin/inoscula-check.ts looks/oil-paint.inoscula --godot godot   # real renders side by side
 node bin/inoscula-live.ts                                        # the live link
 ```
 
@@ -151,9 +195,11 @@ See `docs/TESTING.md` for a step by step test in each program, and `SPEC.md` for
 
 ## Limits (version 0.3)
 
-- **Measured:** Blender (Cycles), Godot 4.5 (Forward+), three.js r170 (RICO's version), Inoscula Live with real
-  Blender. **Compiled but not yet run in the engine:** Unreal and Unity (the HLSL passes the Khronos reference
-  compiler in material, Material Function and Substrate form). Test those first; `docs/TESTING.md` says how.
+- **Measured:** Blender (Cycles), Godot 4.5 (Forward+, both the code shader and the VisualShader), three.js
+  r170 (RICO's version), Inoscula Live with real Blender. **Not yet run in the engine:** Unreal and Unity. The
+  HLSL passes the Khronos reference compiler in material, Material Function and Substrate form; the Unreal
+  native node script and the Unity node view have not been tried in those programs. Test those first;
+  `docs/TESTING.md` says how.
 - **Eevee** uses the same nodes as Cycles but was not measured separately.
 - **Rim and outline shells** (Wet Stroke) are made in Inoscula Studio, RICO (`look.addShells(mesh)`) and Blender
   (`importers/inoscula_shells_blender.py`); for Godot, Unreal and Unity, bring the model saved from Inoscula Studio.

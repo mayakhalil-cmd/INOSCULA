@@ -151,3 +151,15 @@ export function paintShells(pos: ArrayLike<number>, nrm: ArrayLike<number>, idx:
   }
   return { positions: new Float32Array(P), normals: new Float32Array(N), uvs: new Float32Array(U), indices: new Uint32Array(I) }
 }
+
+/** Normals averaged over every vertex at the same position, so a mesh with hard edges (a cylinder's caps, a
+ *  box) inflates into a closed shell instead of splitting apart at its edges. Used for outlines. */
+export function smoothNormals(pos: ArrayLike<number>, nrm: ArrayLike<number>): Float32Array {
+  const n = pos.length / 3
+  const key = (i: number) => `${Math.round(pos[i * 3] * 1e4)},${Math.round(pos[i * 3 + 1] * 1e4)},${Math.round(pos[i * 3 + 2] * 1e4)}`
+  const acc = new Map<string, V>()
+  for (let i = 0; i < n; i++) { const k = key(i), a = acc.get(k) ?? [0, 0, 0]; acc.set(k, add(a, [nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2]])) }
+  const out = new Float32Array(n * 3)
+  for (let i = 0; i < n; i++) { const s = norm(acc.get(key(i))!); out[i * 3] = s[0]; out[i * 3 + 1] = s[1]; out[i * 3 + 2] = s[2] }
+  return out
+}

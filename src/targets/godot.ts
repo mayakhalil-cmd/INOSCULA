@@ -110,6 +110,7 @@ void fragment() {
   float bk = ${b.k === 'ref' ? b.id : 'inoscula_ob'};
   if (bk > 0.0 && inoscula_noise(inoscula_canon(g_vobj), 30.0, 2.0, 0.5, 2.0) < bk) discard;
 ${ir.outline.rings ? `  // loose offset lines: thin rings across the halo, each wobbling on its own
+  if (abs(dot(normalize(NORMAL), normalize(VIEW))) > 0.55) discard;
   if (fract(abs(dot(normalize(NORMAL), normalize(VIEW))) * ${ir.outline.rings}.0 * 1.6 + inoscula_noise(inoscula_canon(g_vobj), 3.0, 1.0, 0.5, 2.0) * 0.7) > 0.3) discard;
 ` : ''}  ALBEDO = ${c.k === 'ref' ? c.id : 'inoscula_oc'};
 }

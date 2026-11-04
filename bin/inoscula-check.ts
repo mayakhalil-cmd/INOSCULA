@@ -80,11 +80,13 @@ const r = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antial
 r.toneMapping = THREE.AgXToneMapping; r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap
 const scene = new THREE.Scene(); scene.background = new THREE.Color().setRGB(0.35, 0.42, 0.55)
 { // an even sky, like Blender's world colour: lights and reflects
+  // the floor blocks the lower half, as it does in Cycles and Godot: without that, undersides glow
   const s = new THREE.Scene(); s.background = new THREE.Color().setRGB(0.35 * 0.6, 0.42 * 0.6, 0.55 * 0.6)
+  const under = new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(0.07, 0.07, 0.07), side: THREE.BackSide })); s.add(under)
   scene.environment = new THREE.PMREMGenerator(r).fromScene(s).texture
 }
 const sun = new THREE.DirectionalLight(0xffffff, 3.5); sun.position.copy(B(-0.5, -0.6, 0.62).normalize().multiplyScalar(8)); sun.castShadow = true
-sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4 }); sun.shadow.bias = -0.0005
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4 }); sun.shadow.bias = -0.0002; sun.shadow.normalBias = 0.03; sun.shadow.camera.near = 2; sun.shadow.camera.far = 16
 scene.add(sun, sun.target)
 const u = {}; for (const [k, v] of Object.entries(sh.uniforms)) u[k] = { value: Array.isArray(v) ? new THREE.Vector3(...v) : v }
 u.inoscula_light_dir.value.copy(sun.position).normalize()
@@ -112,6 +114,12 @@ if (sh.outline) {
   for (const m of [ball, box]) m.add(new THREE.Mesh(m.geometry, om))
 }
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: new THREE.Color().setRGB(0.32, 0.32, 0.32), roughness: 0.9 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor)
+{ // contact shade: the soft darkening where an object meets the floor, which Cycles and Godot get from bounce light
+  const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), gr = x.createRadialGradient(64, 64, 0, 64, 64, 64)
+  gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.3, 'rgba(0,0,0,0.6)'); gr.addColorStop(0.6, 'rgba(0,0,0,0.2)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, 128, 128)
+  const tex = new THREE.CanvasTexture(c)
+  for (const [m, w] of [[ball, 1.5], [box, 2.4]]) { const b = new THREE.Mesh(new THREE.PlaneGeometry(w, w), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.75, toneMapped: false })); b.rotation.x = -Math.PI / 2; b.position.set(m.position.x, 0.002, m.position.z); b.renderOrder = 1; scene.add(b) }
+}
 const cam = new THREE.PerspectiveCamera(2 * Math.atan(Math.tan(Math.atan(18 / 50)) / (4 / 3)) * 180 / Math.PI, 4 / 3, 0.1, 100)
 cam.position.copy(B(0, -6.2, 1.6)); cam.lookAt(B(0, 0, 0.9))
 r.render(scene, cam)

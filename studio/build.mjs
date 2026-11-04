@@ -7,7 +7,7 @@ import path from 'node:path'
 import { stripTypeScriptTypes } from 'node:module'
 
 const [threeFile, outDir, fontDir] = process.argv.slice(2)
-const files = ['src/cards.ts', 'src/spec.ts', 'src/code.ts', 'src/targets/three.ts', 'src/targets/godot.ts', 'src/targets/hlsl.ts', 'src/targets/blender.ts', 'src/lang.ts', 'src/compat.ts']
+const files = ['src/cards.ts', 'src/spec.ts', 'src/code.ts', 'src/targets/three.ts', 'src/targets/godot.ts', 'src/targets/hlsl.ts', 'src/targets/blender.ts', 'src/lang.ts', 'src/compat.ts', 'src/nodes.ts', 'src/native.ts']
 let bundle = ''
 for (const f of files) {
   const js = stripTypeScriptTypes(fs.readFileSync(f, 'utf8'))
@@ -16,10 +16,9 @@ for (const f of files) {
   bundle += `// ---- ${f}\n${js}\n`
 }
 const groups = {
-  'Painterly': [['oil-paint', 'Sphere'], ['wet-stroke', 'Puppet'], ['hand-painted', 'Puppet'], ['oil-strokes', 'Puppet'], ['paint-strokes', 'Puppet'], ['painted-planes', 'Knot'], ['paint-with-light', 'Puppet'], ['painted-character', 'Puppet'], ['brush-paint', 'Puppet']],
-  'Stylised': [['paint-bands', 'Knot'], ['hard-reflections', 'Knot'], ['comic-print', 'Knot'], ['mono-ink', 'Puppet'], ['ink-city', 'Box'], ['engraving', 'Knot'], ['grain-gradient', 'Puppet'], ['iridescent', 'Knot']],
-  'Stop motion and craft': [['claymation', 'Puppet'], ['puppet-felt', 'Puppet'], ['knit', 'Sphere'], ['crochet', 'Sphere'], ['paper-town', 'Box']],
-  'Realistic': [['dusty-metal', 'Box'], ['car-paint', 'Knot'], ['aged-concrete', 'Box']],
+  'Painterly': [['oil-paint', 'Sphere'], ['wet-stroke', 'Puppet'], ['hand-painted', 'Puppet'], ['oil-strokes', 'Puppet'], ['paint-strokes', 'Puppet'], ['painted-planes', 'Knot'], ['paint-with-light', 'Puppet'], ['painted-character', 'Puppet']],
+  'Stylised': [['paint-bands', 'Knot'], ['hard-reflections', 'Knot'], ['comic-print', 'Knot'], ['mono-ink', 'Puppet'], ['engraving', 'Knot'], ['grain-gradient', 'Puppet'], ['iridescent', 'Knot']],
+  'Stop motion and craft': [['claymation', 'Puppet']],
 }
 const looks = Object.entries(groups).flatMap(([group, list]) => list.map(([n, shape]) => {
   const code = fs.readFileSync(`looks/${n}.inoscula`, 'utf8')

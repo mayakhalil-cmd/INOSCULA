@@ -7,9 +7,8 @@ import { stripTypeScriptTypes } from 'node:module'
 import { chromium } from 'playwright'
 
 const [threeFile, outPng, secs = '1.3'] = process.argv.slice(2)
-const order = [['oil-paint', 'Sphere'], ['wet-stroke', 'Puppet'], ['hand-painted', 'Puppet'], ['oil-strokes', 'Puppet'], ['paint-strokes', 'Puppet'], ['painted-planes', 'Knot'], ['paint-with-light', 'Puppet'], ['painted-character', 'Puppet'], ['brush-paint', 'Puppet'], ['paint-bands', 'Knot'], ['hard-reflections', 'Knot'], ['comic-print', 'Knot'], ['mono-ink', 'Puppet'], ['ink-city', 'Box'],
-  ['engraving', 'Knot'], ['grain-gradient', 'Puppet'], ['iridescent', 'Knot'], ['claymation', 'Puppet'], ['puppet-felt', 'Puppet'], ['knit', 'Sphere'],
-  ['crochet', 'Sphere'], ['paper-town', 'Box'], ['dusty-metal', 'Box'], ['car-paint', 'Knot'], ['aged-concrete', 'Box']]
+const order = [['oil-paint', 'Sphere'], ['wet-stroke', 'Puppet'], ['hand-painted', 'Puppet'], ['oil-strokes', 'Puppet'], ['paint-strokes', 'Puppet'], ['painted-planes', 'Knot'], ['paint-with-light', 'Puppet'], ['painted-character', 'Puppet'], ['paint-bands', 'Knot'], ['hard-reflections', 'Knot'], ['comic-print', 'Knot'], ['mono-ink', 'Puppet'], ['ink-city', 'Box'],
+  ['engraving', 'Knot'], ['grain-gradient', 'Puppet'], ['iridescent', 'Knot'], ['claymation', 'Puppet']]
 const looks = order.map(([n, shape]) => ({ code: fs.readFileSync(`looks/${n}.inoscula`, 'utf8'), shape }))
 const COLS = 6, CW = 360, CH = 380
 const W = COLS * CW, H = Math.ceil(looks.length / COLS) * CH
@@ -99,8 +98,8 @@ const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=sw
 const tab = await browser.newPage({ viewport: { width: 1200, height: 800 } })
 tab.on('pageerror', (e) => console.log('page exception:', e.message))
 tab.on('console', (m) => { if (m.type() === 'error') console.log('page error:', m.text().slice(0, 400)) })
-await tab.goto(`http://localhost:${server.address().port}/`)
-await tab.waitForFunction('window.done', null, { timeout: 300000 })
+await tab.goto(`http://localhost:${server.address().port}/`, { waitUntil: 'commit', timeout: 600000 })
+await tab.waitForFunction('window.done', null, { timeout: 3000000 })
 fs.writeFileSync(outPng, Buffer.from((await tab.evaluate('window.done')).split(',')[1], 'base64'))
 console.log('wrote', outPng)
 await browser.close(); server.close()

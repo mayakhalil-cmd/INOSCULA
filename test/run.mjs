@@ -48,15 +48,15 @@ sh(`python3 test/blender_bake.py ${T}/voronoi ${T}/voronoi/v.blender.py`)
 sh(`node test/parity.mjs ${T}/voronoi/blender.json ${three} ${T}/voronoi ${T}/voronoi/graphs --exact`)
 
 // 4c. Inoscula Live: browser, relay, real Blender and OSC, both directions
-fs.writeFileSync(`${T}/knit.blender.py`, toBlender(check(parse(fs.readFileSync('looks/knit.inoscula', 'utf8')))))
-sh(`node test/live_test.mjs ${T}/knit.blender.py`)
+fs.writeFileSync(`${T}/claymation.blender.py`, toBlender(check(parse(fs.readFileSync('looks/claymation.inoscula', 'utf8')))))
+sh(`node test/live_test.mjs ${T}/claymation.blender.py`)
 
 // 5. RICO adapter and the studio
 sh(`node test/rico_preview.mjs ${three} ${T}/rico-preview.png`)
 sh(`node test/looks_preview.mjs ${three} ${T}/looks.png`)
 if (fs.existsSync('dist/inoscula-studio.html')) { fs.mkdirSync(`${T}/studio`, { recursive: true }); sh(`node test/studio_check.mjs ${process.cwd()}/dist/inoscula-studio.html ${T}/studio${process.env.MODEL ? ' ' + process.env.MODEL : ''}`) }
 // 6. render check: the same scene rendered by RICO, Blender (Cycles) and Godot, side by side
-for (const look of ['dusty-metal', 'car-paint', 'paint-bands', 'hard-reflections', 'oil-strokes', 'paint-strokes']) {
+for (const look of ['claymation', 'comic-print', 'paint-bands', 'hard-reflections', 'oil-strokes', 'paint-strokes']) {
   sh(`node bin/inoscula-check.ts looks/${look}.inoscula --out ${T}/check --three ${three}${process.env.GODOT ? ' --godot ' + process.env.GODOT : ''}`)
 }
 console.log('\nAll checks ran. Pictures and numbers are in ' + T)

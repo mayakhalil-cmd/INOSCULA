@@ -1,40 +1,92 @@
-// Claymation: plasticine, thumbprints, waxy shine
+// Claymation: modelling clay, fingerprints, tool marks, waxy sheen
 name "Claymation";
+shading "lit";
 
-uniform vec3 clay = vec3(0.78, 0.33, 0.18);   // @color @label Clay
-uniform vec3 shadow = vec3(0.25, 0.07, 0.10); // @color @label Shadow
-uniform float prints = 0.6;                    // @range 0 1 @label Thumbprints
-uniform float lumps = 0.35;                    // @range 0 1 @label Mixing Streaks
-uniform float wax = 0.35;                      // @range 0 1 @label Wax Shine
-uniform float fps = 12.0;                      // @range 1 24 @label Frames Per Second
-uniform float boil = 0.04;                     // @range 0 0.2 @label Handling
+uniform vec3 clay = vec3(0.72, 0.2, 0.08);          // @color @label Clay
+uniform vec3 clayB = vec3(0.86, 0.42, 0.14);        // @color @label Second Clay (marbling)
+uniform float marble = 0.3;                          // @range 0 1 @label Marbling
+uniform float prints = 0.55;                         // @range 0 1 @label Fingerprints
+uniform float printSize = 0.16;                      // @range 0.05 0.4 @label Fingerprint Size
+uniform float ridges = 0.6;                          // @range 0 1 @label Ridge Depth
+uniform float tools = 0.45;                          // @range 0 1 @label Tool Marks
+uniform float dents = 0.5;                           // @range 0 1 @label Thumb Dents
+uniform float wax = 0.45;                            // @range 0 1 @label Waxy Sheen
+uniform float grime = 0.35;                          // @range 0 1 @label Grime In Creases
+uniform float fps = 12.0;                            // @range 1 24 @label Frames Per Second
+uniform float handling = 0.3;                        // @range 0 1 @label Handling Between Frames
+
+vec3 crossv(vec3 a, vec3 b) {
+  return vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+}
+
+// One fingerprint per cell: an oval of fine ridges that loop around a core, pressed into the surface
+vec3 fingerprint(vec3 p, vec3 n, float size, float on) {
+  float cell = voronoi(p, 1.0 / size, 1.0);
+  vec3 c = cell.position;
+  vec3 r = cell.color;
+  vec3 o = p - c;
+  o = o - n * dot(o, n);
+  // each print has its own direction and stretch, like a thumb pressed at a slant
+  vec3 t = normalize(crossv(n, normalize(r - vec3(0.5)) + vec3(0.0001, 0.0002, 0.0003)));
+  vec3 b = crossv(n, t);
+  float u = dot(o, t) / size;
+  float v = dot(o, b) / (size * (0.62 + r.y * 0.25));
+  float rad = sqrt(u * u + v * v);
+  float ang = atan(v, u);
+  // ridges: rings around the core that open into a loop and run off in parallel, wavering like skin
+  float warp = noise(o * 6.0 / size, 1.0, 3.0, 0.6, 2.0);
+  float loopU = u + (r.z - 0.5) * 0.3;
+  float f = mix(abs(v) + 0.08, rad, smoothstep(-0.25, 0.15, loopU));
+  float phase = f * 64.0 + ang * step(0.6, r.z) + (warp - 0.5) * 7.0;
+  float ridge = 0.5 + 0.5 * sin(phase);
+  ridge = smoothstep(0.15, 0.85, ridge);
+  // breaks in the ridges, and an uneven edge where the thumb rolled and lifted off
+  float pores = smoothstep(0.25, 0.5, noise(o * 70.0 / size, 1.0, 1.0, 0.5, 2.0));
+  float edge = 0.5 + (noise(o * 3.0 / size + r * 9.0, 1.0, 2.0, 0.5, 2.0) - 0.5) * 0.5;
+  float mask = smoothstep(edge, edge - 0.2, rad) * step(r.x, on) * (0.55 + 0.45 * pores);
+  float dish = smoothstep(edge + 0.15, 0.0, rad) * step(r.x, on);
+  return vec3(ridge * mask, dish, mask);
+}
 
 void main() {
   float frame = floor(time * fps);
-  vec3 nudge = vec3(hash(vec3(frame, 4.0, 1.0)), hash(vec3(frame, 5.0, 1.0)), hash(vec3(frame, 6.0, 1.0))) * boil;
-  vec3 p = object_pos + nudge;
+  vec3 nudge = vec3(hash(vec3(frame, 4.0, 1.0)), hash(vec3(frame, 5.0, 1.0)), hash(vec3(frame, 6.0, 1.0))) - vec3(0.5);
+  vec3 p = object_pos;
+  vec3 n = object_normal;
+  float s = object_size / 2.0;
 
-  // Soft blend
-  float ndl = dot(normal, light_dir);
-  float wrap = smoothstep(-0.45, 1.0, ndl);
+  // Marbled clay: two colours kneaded together in long smeared streaks
+  vec3 sp = p + nudge * 0.004 * handling;
+  float knead = noise(sp * vec3(1.0, 1.0, 3.5) / s + vec3(noise(sp / s, 1.5, 2.0, 0.5, 2.0) * 1.5), 1.8, 3.0, 0.55, 2.0);
+  float vein = smoothstep(0.5, 0.6, knead) * marble;
+  vec3 base = mix(clay, clayB, vein);
+  base = base * (0.93 + 0.14 * noise(sp / s, 9.0, 2.0, 0.5, 2.0));
 
-  // Kneading marks
-  float streak = noise(p * vec3(1.0, 1.0, 3.0), 2.2, 3.0, 0.55, 2.0);
-  vec3 tint = clay * (1.0 + (streak - 0.5) * lumps);
+  // Fingerprints, two layers so they overlap like handling
+  vec3 fa = fingerprint(sp / s, n, printSize, prints);
+  vec3 fb = fingerprint(sp / s + vec3(13.1, 7.7, 3.3), n, printSize * 0.8, prints * 0.6);
+  float ridge = max(fa.x, fb.x);
+  float dish = max(fa.y, fb.y);
+  float printed = max(fa.z, fb.z);
 
-  // Thumbprints
-  float patch = smoothstep(0.48, 0.62, noise(p, 1.4, 1.0, 0.5, 2.0));
-  float swirl = noise(p, 3.0, 2.0, 0.5, 2.0);
-  float ridges = 0.5 + 0.5 * sin(length(fract(p * 1.3) - vec3(0.5)) * 90.0 + swirl * 12.0);
-  float press = ridges * patch * prints;
+  // Tool marks: dragged, parallel scrapes from a modelling tool, and pressed dents
+  float drag = noise(sp * vec3(28.0, 28.0, 2.5) / s, 1.0, 2.0, 0.5, 2.0);
+  float scrape = smoothstep(0.55, 0.75, drag) * smoothstep(0.45, 0.6, noise(sp / s, 2.2, 1.0, 0.5, 2.0)) * tools;
+  float dent = smoothstep(0.62, 0.8, noise(sp / s + vec3(40.0), 3.0, 1.0, 0.5, 2.0)) * dents;
 
-  vec3 c = mix(shadow, tint, wrap) * (1.0 - press * 0.28);
-
-  // Broad waxy highlight
-  vec3 h = normalize(light_dir + view_dir);
-  float spec = pow(max(dot(normal, h), 0.0), 18.0) * wax * (1.0 - press * 0.7);
-  // Warm light bleed
-  float edge = 1.0 - max(dot(normal, view_dir), 0.0);
-  c = c + vec3(spec) * light_color + clay * pow(edge, 3.0) * 0.25;
+  // Colour: ridges and scrapes catch a little dust, creases hold grime
+  vec3 c = base * (1.0 - ridge * 0.12 - scrape * 0.1);
+  c = mix(c, c * vec3(0.45, 0.38, 0.36), (1.0 - occlusion) * grime);
   color = c;
+
+  // Height: dents and thumb dishes press in, ridges stand up, scrapes cut grooves
+  bump = (ridge * 0.00035 * ridges - dish * 0.0006 * dents - dent * 0.0012 - scrape * 0.00025) * s;
+
+  // A soft, waxy surface: broad sheen, rougher where handled
+  roughness = 0.62 - wax * 0.25 + ridge * 0.15 + scrape * 0.1;
+  metallic = 0.0;
+  sheen = wax * 0.6;
+  sheen_color = mix(vec3(1.0), clayB, 0.4);
+  sheen_roughness = 0.5;
+  subsurface = 0.18;
 }

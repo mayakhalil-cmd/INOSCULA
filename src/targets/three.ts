@@ -139,6 +139,7 @@ void main() {
   if (inoscula_outline_breakup > 0.0 && inoscula_noise(inoscula_canon(g_vobj), 30.0, 2.0, 0.5, 2.0) < inoscula_outline_breakup) discard;
 ${ir.outline.rings ? `  // loose offset lines: thin rings across the halo, each wobbling on its own
   float g_face = abs(dot(normalize(g_vn), normalize(cameraPosition - g_vw)));
+  if (g_face > 0.55) discard; // flat faces turned to the camera (a cylinder's cap) show no rings
   if (fract(g_face * ${ir.outline.rings}.0 * 1.6 + inoscula_noise(inoscula_canon(g_vobj), 3.0, 1.0, 0.5, 2.0) * 0.7) > 0.3) discard;
 ` : ''}  gl_FragColor = vec4(inoscula_outline_color, 1.0);
   #include <colorspace_fragment>

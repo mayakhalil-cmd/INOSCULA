@@ -2,7 +2,7 @@
 // inoscula <shader.inoscula.json> [--to three,godot,unreal,unity,blender] [--out folder]
 import fs from 'node:fs'
 import path from 'node:path'
-import { check, InosculaError, toBlender, toGodot, toThree, toUnity, toUnreal, GODOT_LIGHT_BRIDGE } from '../src/index.ts'
+import { check, InosculaError, toBlender, toGodot, toGodotVisual, toThree, toUnity, toUnreal, toUnrealNative, GODOT_LIGHT_BRIDGE } from '../src/index.ts'
 
 const args = process.argv.slice(2)
 const opt = (k: string, d: string) => { const i = args.indexOf(k); return i >= 0 ? args.splice(i, 2)[1] : d }
@@ -21,8 +21,8 @@ for (const file of args) {
     console.log(`${ir.name}:`)
     for (const t of to) {
       if (t === 'three') { const s = toThree(ir); write(`${base}.three.json`, JSON.stringify(s, null, 2)) }
-      else if (t === 'godot') { write(`${base}.gdshader`, toGodot(ir)); write('inoscula_light_bridge.gd', GODOT_LIGHT_BRIDGE) }
-      else if (t === 'unreal') write(`${base}.unreal.py`, toUnreal(ir))
+      else if (t === 'godot') { write(`${base}.gdshader`, toGodot(ir)); write(`${base}.tres`, toGodotVisual(ir)); write('inoscula_light_bridge.gd', GODOT_LIGHT_BRIDGE) }
+      else if (t === 'unreal') { write(`${base}.unreal.py`, toUnrealNative(ir)); write(`${base}.unreal-custom.py`, toUnreal(ir)) }
       else if (t === 'unity') write(`${base}.unity.hlsl`, toUnity(ir))
       else if (t === 'blender') write(`${base}.blender.py`, toBlender(ir))
       else throw new InosculaError(`Unknown target "${t}".`)

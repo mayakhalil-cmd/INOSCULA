@@ -16,6 +16,7 @@ uniform vec3 sheenA = vec3(0.2, 0.55, 0.75);          // @color @label Sheen Col
 uniform vec3 sheenB = vec3(0.85, 0.3, 0.45);          // @color @label Sheen Colour B
 uniform float variety = 0.35;                         // @range 0 1 @label Colour Variety
 uniform float sheen = 0.45;                           // @range 0 1 @label Sheen
+uniform vec3 swirlCenter = vec3(0.0, 0.0, 0.0);      // @label Swirl Centre (world)
 uniform float groundAware = 1.0;                      // @range 0 1 @label Calm Paint On Big Flat Surfaces
 uniform vec3 keyPos = vec3(3.5, 0.8, 3.0);          // @label Key Light Position
 uniform float keyPoint = 0.0;                        // @range 0 1 @label Lights From Positions (0: follow the scene's sun)
@@ -125,7 +126,7 @@ void main() {
   float e = mix((pt.z - 0.5) * 0.35 * smoothstep(0.1, 0.4, fract(pt.y)), (cstreak - 0.5) * 0.4, card);
 
   // Sweeping strokes on large surfaces
-  vec3 gp = p + seed;
+  vec3 gp = (world_pos - swirlCenter) * pow(2.6 / max(object_size, 0.001), adapt * 0.7) + seed;
   float gx = dot(gp, right);
   float gy = dot(gp, upv);
   float gr = sqrt(gx * gx + gy * gy) + 0.0001;
@@ -133,7 +134,7 @@ void main() {
   float gw = smoothstep(0.03, 0.25, gr);
   vec3 gq = vec3(gr * strokeSize * 6.0, gx / gr * 3.0, gy / gr * 3.0) * gw + gp * strokeSize * 2.0 * (1.0 - gw);
   float gs = saturate((noise(gq, 1.0, 3.0, 0.6, 2.0) - 0.28) * 2.3);
-  float gst = noise(vec3(gr * strokeSize * 60.0, gx / gr * 5.0, gy / gr * 5.0) * gw + gp * strokeSize * 12.0 * (1.0 - gw), 1.0, 2.0, 0.5, 2.0);
+  float gst = noise(vec3(gr * strokeSize * 24.0, gx / gr * 4.0, gy / gr * 4.0) * gw + gp * strokeSize * 8.0 * (1.0 - gw), 1.0, 2.0, 0.5, 2.0);
   rnd = mix(rnd, floor(gs * 7.0) / 7.0 + 0.07, ground);
   rnd2 = mix(rnd2, fract(floor(gs * 7.0) * 0.37), ground);
   streak = mix(streak, gst, ground);
@@ -176,8 +177,8 @@ void main() {
   c = c * (1.0 - down * 0.75 * (1.0 - smoothstep(0.45, 0.8, lightAmt) * 0.6));
 
   // Canvas weave
-  float wx = sin(dot(world_pos, right) * 150.0);
-  float wy = sin(dot(world_pos, upv) * 150.0);
+  float wx = sin(dot(p, right) * 220.0);
+  float wy = sin(dot(p, upv) * 220.0);
   c = c * (1.0 - canvas * (0.07 + ground * 0.1) * (wx * 0.5 + 0.5) * (wy * 0.5 + 0.5) * smoothstep(0.5, 0.8, lightAmt) * (1.0 - card));
 
   // Edge

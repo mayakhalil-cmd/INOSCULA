@@ -6,7 +6,7 @@
 // THREE is passed in so this file never bundles its own copy.
 import { check, type Graph } from './spec.ts'
 import { toThree, type ThreeOpts } from './targets/three.ts'
-import { brushCards, meshArea, paintShells, type CardOptions, type ShellOptions } from './cards.ts'
+import { brushCards, meshArea, paintShells, smoothNormals, type CardOptions, type ShellOptions } from './cards.ts'
 
 type V3 = [number, number, number]
 
@@ -59,7 +59,13 @@ export function inosculaMaterial(THREE: any, graph: Graph, opts: ThreeOpts & { t
       if (!outlineMaterial) return
       const meshes: any[] = []
       obj.traverse?.((o: any) => { if (o.isMesh && !o.userData.inosculaOutline && !o.userData.inosculaCards) meshes.push(o) })
-      for (const m of meshes) { const o = new THREE.Mesh(m.geometry, outlineMaterial); o.userData.inosculaOutline = true; m.add(o) }
+      for (const m of meshes) {
+        // the outline shell inflates along smooth normals, so hard edges stay closed
+        const g = m.geometry.clone()
+        if (!g.attributes.normal) g.computeVertexNormals()
+        g.setAttribute('normal', new THREE.BufferAttribute(smoothNormals(g.attributes.position.array, g.attributes.normal.array), 3))
+        const o = new THREE.Mesh(g, outlineMaterial); o.userData.inosculaOutline = true; m.add(o)
+      }
     },
     /** Tells the shader how big this object is (object_size), so a look keeps the same number of strokes on a
      *  pebble and on a building. Call once per object that uses the material, and again after resizing it. */

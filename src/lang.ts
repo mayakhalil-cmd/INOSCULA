@@ -270,7 +270,10 @@ export function parse(src: string): Graph {
     }
     calling.pop()
     p = saveP; curLine = saveLine
+    // inputs first read inside the function stay known, so the rest of the shader reuses the same node
+    const inputs = [...vars].filter(([k]) => k.startsWith('@'))
     vars.clear(); for (const [k, v] of saveVars) vars.set(k, v)
+    for (const [k, v] of inputs) if (!vars.has(k)) vars.set(k, v)
     return result!
   }
   function define() {
@@ -345,6 +348,8 @@ export function parse(src: string): Graph {
     if (typeof v !== 'string' || v.startsWith('$') || v.includes('.')) return v
     const node = nodes.find((n) => n.id === v)
     if (!node || nodes.some((n) => n.id === nm)) return v
+    // inside a function, keep the shader's shared inputs under their own names (the caller still knows them so)
+    if (calling.length && Object.values(BUILTINS).includes(node.op)) return v
     const old = node.id
     node.id = fresh(nm)
     lineOf.set(node.id, lineOf.get(old) ?? curLine)

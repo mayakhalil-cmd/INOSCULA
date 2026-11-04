@@ -1,7 +1,8 @@
 <title>Inoscula Studio</title>
 <style>
 /*FONTS*/
-/* Layout: a working desk. Code or nodes on the left, the lit object on the right, the exports underneath.
+/* Layout: the stage (live preview beside the parameters) stays at the top; the shader, as code or nodes for each
+   program, sits underneath. Either panel can swap into the stage, and every split can be dragged.
    RICO Engine's own system: true black, brand lime for anything live, pink for the press shadow, square edges. */
 :root {
   --bg: #000000;
@@ -31,8 +32,8 @@ code { color: var(--green); }
   padding-block: 14px 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 
 .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; border-bottom: 2px solid var(--line); padding-bottom: 12px; }
-.logo { font-family: var(--font-title); font-size: 2.1rem; line-height: 1; color: var(--green); letter-spacing: 0.04em; text-shadow: 0 0 10px rgba(59, 255, 3, 0.45); margin: 0; }
-.logo span { color: var(--text); text-shadow: none; }
+.logo { font-family: var(--font-title); font-size: 2.1rem; line-height: 1; color: #ffffff; letter-spacing: 0.04em; text-shadow: 0 0 10px rgba(255, 255, 255, 0.35); margin: 0; }
+.logo span { color: var(--green); text-shadow: none; }
 .sub { color: var(--muted); font-size: 0.82rem; max-width: 36ch; line-height: 1.35; }
 .bar .grow { flex: 1 1 auto; }
 .tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -47,12 +48,26 @@ code { color: var(--green); }
 .btn.small { font-size: 0.95rem; padding: 2px 9px 1px; }
 select.btn { padding-right: 8px; max-width: 100%; }
 select.btn option, select.btn optgroup { background: #000; color: var(--text); font-family: var(--font); }
+.link-state { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 0.8rem; }
+.link-state::before { content: ""; width: 8px; height: 8px; background: #3a3a3a; }
+.link-state.on { color: var(--green); } .link-state.on::before { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.link-state.warn { color: var(--amber); } .link-state.warn::before { background: var(--amber); }
 .pill { font-family: var(--font-title); font-size: 0.95rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px 1px; border: 1px solid var(--line); color: var(--muted); }
 .pill.on { border-color: var(--green); color: var(--green); }
 .pill.warn { border-color: var(--amber); color: var(--amber); }
 
-.desk { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; }
-.frame { border: 2px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-width: 0; }
+.stage { display: grid; grid-template-columns: minmax(0, var(--split, 1.25fr)) 10px minmax(0, 1fr); height: var(--stageH, min(72vh, 680px)); min-height: 320px; }
+.slot { min-width: 0; min-height: 0; display: flex; }
+.slot > .frame { flex: 1 1 auto; }
+.below { height: var(--belowH, 640px); min-height: 260px; }
+.vsplit, .hsplit { background: transparent; position: relative; touch-action: none; }
+.vsplit { cursor: col-resize; }
+.hsplit { cursor: row-resize; height: 12px; margin: -2px 0; }
+.vsplit::after, .hsplit::after { content: ""; position: absolute; background: var(--line); }
+.vsplit::after { left: 4px; width: 2px; top: 0; bottom: 0; }
+.hsplit::after { top: 5px; height: 2px; left: 0; right: 0; }
+.vsplit:hover::after, .hsplit:hover::after, .vsplit:focus-visible::after, .hsplit:focus-visible::after { background: var(--green); }
+.frame { border: 2px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .frame.live { border-color: var(--green); }
 .head { display: flex; align-items: center; gap: 10px; justify-content: space-between; padding: 6px 10px; border-bottom: 2px solid var(--line); flex-wrap: wrap;
   font-family: var(--font-title); font-size: 1.05rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
@@ -69,7 +84,7 @@ select.chip { padding-right: 4px; }
 select.chip option { background: #000; color: var(--text); }
 
 /* editor */
-.editor { position: relative; flex: 1 1 auto; min-height: 560px; display: grid; grid-template-columns: auto minmax(0, 1fr); overflow: hidden; }
+.editor { position: relative; flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); overflow: hidden; }
 .gutter { padding: 12px 8px 12px 10px; text-align: right; color: var(--green-dim); user-select: none; font-size: 13px; line-height: 20px;
   border-right: 1px solid var(--line); background: #010400; overflow: hidden; font-variant-numeric: tabular-nums; }
 .gutter div.bad { color: #000; background: var(--pink); }
@@ -84,17 +99,15 @@ select.chip option { background: #000; color: var(--text); }
 .t-com { color: #6f8a66; font-style: italic; } .t-in { color: #8ff6ff; } .t-fn { color: #c9ffb3; } .t-out { color: var(--amber); }
 
 /* node view */
-.nodes { flex: 1 1 auto; min-height: 560px; height: 0; overflow: auto; background: #010400; position: relative; cursor: grab; }
-.nodes svg { display: block; }
-.nodes .n rect { fill: var(--surface-2); stroke: var(--line); stroke-width: 1.5; }
-.nodes .n.src rect { stroke: #2d7a8a; }
-.nodes .n.out rect { stroke: var(--amber); }
-.nodes .n:hover rect, .nodes .n.sel rect { stroke: var(--green); }
-.nodes .n text { font-family: var(--font); font-size: 11px; fill: var(--muted); }
-.nodes .n text.title { font-family: var(--font-title); font-size: 14px; fill: var(--green); letter-spacing: 0.05em; }
-.nodes path.w { fill: none; stroke: var(--green-dim); stroke-width: 1.4; opacity: 0.7; }
-.nodes path.w.v { stroke: var(--blue); }
-.nodes .lit { fill: var(--pink); }
+.nodes { flex: 1 1 auto; min-height: 0; overflow: hidden; position: relative; cursor: grab; touch-action: none; user-select: none; }
+.nodes svg.graph { display: block; width: 100%; height: 100%; }
+.nodes .zoom { position: absolute; right: 8px; top: 8px; display: flex; gap: 4px; z-index: 2; }
+.nodes .zoom .chip { background: rgba(0, 0, 0, 0.75); }
+.nodes .legend { position: absolute; left: 8px; bottom: 6px; font-size: 0.72rem; color: var(--muted); pointer-events: none; background: rgba(0, 0, 0, 0.72); padding: 3px 6px; max-width: 70%; }
+.nodes text { font-family: var(--font); font-size: 11.5px; }
+.nodes .nt { font-size: 12.5px; font-weight: bold; }
+.nodes g.n { cursor: pointer; }
+.nodes g.n.sel .body { stroke: #ffffff; stroke-width: 2; }
 
 .status { border-top: 2px solid var(--line); padding: 8px 10px; font-size: 0.84rem; line-height: 1.4; min-height: 2.6em; color: var(--muted); }
 .status.ok b { color: var(--green); }
@@ -102,7 +115,8 @@ select.chip option { background: #000; color: var(--text); }
 .status.err b { color: var(--pink); }
 
 /* preview */
-.view { position: relative; aspect-ratio: 4 / 3; max-width: 100%; background: #000; cursor: grab; touch-action: none; }
+.view { position: relative; flex: 1 1 auto; min-height: 160px; background: #000; cursor: grab; touch-action: none; overflow: hidden; }
+.view canvas { position: absolute; inset: 0; }
 .view canvas { width: 100%; height: 100%; display: block; }
 .view .hint { position: absolute; left: 10px; bottom: 8px; font-size: 0.75rem; color: var(--muted); pointer-events: none; text-shadow: 0 0 4px #000; }
 .view .busy { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.7); font-family: var(--font-title); font-size: 1.4rem; color: var(--green); letter-spacing: 0.06em; }
@@ -112,8 +126,15 @@ select.chip option { background: #000; color: var(--text); }
 .notes div::before { content: "\25A0  "; }
 .notes .same::before { color: var(--green); } .notes .close::before { color: var(--amber); } .notes .missing::before { color: var(--pink); }
 
-.panel { padding: 10px 12px 14px; display: grid; gap: 10px; }
-.row { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr) 3.6rem 1.8rem; gap: 10px; align-items: center; }
+.panel { padding: 10px 12px 14px; display: grid; gap: 10px; align-content: start; overflow: auto; flex: 1 1 auto; min-height: 0; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.seg .chip { min-width: 2.2rem; text-align: center; }
+.rowb { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); gap: 10px; align-items: center; }
+.rowb > label, .rowb > span { color: var(--muted); font-size: 0.85rem; }
+.row .byp { width: 1.8rem; height: 1.5rem; padding: 0; font-size: 0.7rem; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font-family: var(--font-title); }
+.row .byp.on { background: #2a2a2a; color: #fff; border-color: #777; }
+.row.off input[type=range] { opacity: 0.35; }
+.row { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr) 3.6rem 1.8rem 1.8rem; gap: 8px; align-items: center; }
 .row label { color: var(--muted); font-size: 0.85rem; overflow-wrap: anywhere; }
 .row output { font-variant-numeric: tabular-nums; color: var(--green); font-size: 0.85rem; text-align: right; }
 .row .lfo { width: 1.8rem; height: 1.5rem; padding: 0; font-size: 0.85rem; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
@@ -123,7 +144,15 @@ input[type=color] { width: 100%; height: 26px; border: 1px solid var(--line); ba
 .sect { font-family: var(--font-title); font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--green-dim); border-top: 1px dashed var(--line); padding-top: 8px; }
 .sect:first-child { border-top: 0; padding-top: 0; }
 
-.out { display: flex; flex-direction: column; }
+.progbar { display: flex; flex-direction: column; }
+.dump.code-out { flex: 1 1 auto; max-height: none; min-height: 0; }
+.travel { border-top: 2px solid var(--line); max-height: 7em; overflow: auto; }
+.travel .notes { border-bottom: 0; }
+.howto { counter-reset: st; display: grid; gap: 10px; padding: 12px 14px; overflow: auto; font-size: 0.86rem; line-height: 1.5; color: var(--muted); }
+.howto .st { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 8px; }
+.howto .st::before { counter-increment: st; content: counter(st); font-family: var(--font-title); font-size: 1.3rem; color: #000; background: var(--green); text-align: center; height: 1.7rem; line-height: 1.8rem; }
+.howto b { color: #fff; font-weight: normal; }
+.howto pre { margin: 4px 0 0; padding: 6px 8px; background: #000; border: 1px solid var(--line); color: #d9f7cf; white-space: pre-wrap; font-size: 12px; }
 .tabs { display: flex; flex-wrap: wrap; border-bottom: 2px solid var(--line); }
 .tab { font-family: var(--font-title); font-size: 1.05rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 12px 4px; border: 0;
   border-right: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
@@ -148,9 +177,12 @@ input[type=color] { width: 100%; height: 26px; border: 1px solid var(--line); ba
   font-family: var(--font-title); font-size: 1.1rem; letter-spacing: 0.06em; padding: 6px 14px 4px; text-transform: uppercase; box-shadow: 4px 4px 0 var(--pink); z-index: 30; max-width: calc(100% - 32px); }
 
 @media (max-width: 960px) {
-  .desk { grid-template-columns: minmax(0, 1fr); }
-  .editor, .nodes { min-height: 420px; }
-  .row { grid-template-columns: 7rem minmax(0, 1fr) 3.2rem 1.8rem; }
+  .stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(260px, 1fr) auto; height: auto; }
+  .stage .vsplit { display: none; }
+  .stage .view { min-height: 62vw; }
+  .stage #sideSlot { height: 520px; }
+  .row { grid-template-columns: 7rem minmax(0, 1fr) 3.2rem 1.8rem 1.8rem; }
+  .rowb { grid-template-columns: 7rem minmax(0, 1fr); }
   .split { grid-template-columns: minmax(0, 1fr); }
   .split .notes { border-left: 0; border-top: 1px solid var(--line); }
 }
@@ -166,28 +198,15 @@ input[type=color] { width: 100%; height: 26px; border: 1px solid var(--line); ba
       <select id="look" class="btn" aria-label="Start from a look"></select>
       <button id="openBtn" class="btn ghost" type="button">Open</button>
       <button id="saveSrcBtn" class="btn ghost" type="button">Save</button>
+      <button id="saveLookBtn" class="btn ghost" type="button" title="Keep this shader in the look list under your own name">Save as look</button>
       <button id="importBtn" class="btn ghost" type="button">Import graph</button>
-      <button id="liveBtn" class="btn ghost" type="button" aria-pressed="false">Live link</button>
-      <span id="livePill" class="pill">Offline</span>
+      <button id="liveBtn" class="btn ghost" type="button">Live link</button>
+      <span id="liveState" class="link-state" role="status">Not linked</span>
     </div>
   </header>
 
-  <div class="desk">
-    <section class="frame live" aria-label="Shader">
-      <div class="head"><span class="chips" role="tablist"><button class="chip on" id="viewCode" type="button">Code</button><button class="chip" id="viewNodes" type="button">Nodes</button></span>
-        <span class="r"><span id="fileName">untitled.inoscula</span><button id="refBtn" class="chip" type="button">Reference</button></span></div>
-      <div class="editor" id="editorBox">
-        <div class="gutter" id="gutter" aria-hidden="true"></div>
-        <div class="code">
-          <pre id="hl" aria-hidden="true"></pre>
-          <textarea id="src" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Inoscula shader code"></textarea>
-        </div>
-      </div>
-      <div class="nodes" id="nodesBox" hidden aria-label="Node graph"></div>
-      <div id="status" class="status">Compiling&hellip;</div>
-    </section>
-
-    <section class="frame" aria-label="Live preview">
+  <div class="stage" id="stage">
+    <section class="frame" aria-label="Live preview" id="viewFrame">
       <div class="head"><span><b>Preview</b></span>
         <span class="r chips" id="shapes"></span></div>
       <div class="lightbar">
@@ -208,33 +227,97 @@ input[type=color] { width: 100%; height: 26px; border: 1px solid var(--line); ba
         <button id="lightBtn" class="chip" type="button" aria-pressed="false">Move light</button>
         <button id="groundBtn" class="chip on" type="button" aria-pressed="true">Floor</button>
       </div>
-      <div class="view" id="view"><canvas id="gl"></canvas><div class="hint" id="hint">Drag to turn the object.</div><div class="busy" id="busy" hidden>Working&hellip;</div></div>
+      <div class="view" id="view"><canvas id="gl"></canvas><div class="hint" id="hint">Drag to turn the object. Scroll to zoom.</div><div class="busy" id="busy" hidden>Working&hellip;</div></div>
       <div class="lightbar">
         <button id="modelBtn" class="chip" type="button">Load model</button>
         <button id="prepBtn" class="chip" type="button" disabled>Prepare model</button>
         <button id="cardsBtn" class="chip" type="button" aria-pressed="false" title="Lay single brush strokes over the model, lifted off the surface so they break the silhouette">Brush cards</button>
         <button id="saveModelBtn" class="chip" type="button" disabled>Save model</button>
-        <span id="modelInfo">Bring a .glb, .gltf or .obj. Prepare model stores curvature and occlusion for wear and grime.</span>
+        <span id="modelInfo">Bring a .glb, .gltf or .obj.</span>
         <input type="file" id="modelIn" accept=".glb,.gltf,.obj" hidden>
       </div>
-      <div class="head"><span><b>Parameters</b></span>
-        <span class="r"><button id="playBtn" class="chip on" type="button">Playing</button><input type="range" id="scrub" min="0" max="10" step="0.01" value="0" aria-label="Time" style="width: 8rem"><span id="clock" style="font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right;">0.00s</span></span></div>
-      <div class="panel" id="params"></div>
+      <div class="lightbar" id="sceneBar">
+        <span>Add to the scene</span>
+        <select id="guestShape" class="chip" aria-label="Shape"><option>Sphere</option><option>Knot</option><option>Puppet</option><option>Box</option></select>
+        <select id="guestLook" class="chip" aria-label="Its look"></select>
+        <button id="guestAdd" class="chip" type="button">Add object</button>
+        <span class="chips" id="guests"></span>
+      </div>
+    </section>
+    <div class="vsplit" id="vsplit" role="separator" aria-orientation="vertical" aria-label="Drag to resize the preview" tabindex="0"></div>
+    <div class="slot" id="sideSlot">
+      <section class="frame" aria-label="Parameters" id="paramsFrame">
+        <div class="head"><span><b>Parameters</b></span>
+          <span class="r"><button id="playBtn" class="chip on" type="button">Playing</button><input type="range" id="scrub" min="0" max="10" step="0.01" value="0" aria-label="Time" style="width: 7rem"><span id="clock" style="font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right;">0.00s</span><button class="chip swap" type="button" title="Swap this panel with the shader panel">Swap</button></span></div>
+        <div class="panel" id="params"></div>
+      </section>
+    </div>
+  </div>
+  <div class="hsplit" id="hsplitStage" role="separator" aria-orientation="horizontal" aria-label="Drag to resize the stage" tabindex="0"></div>
+
+  <div class="slot below" id="belowSlot">
+    <section class="frame live" aria-label="Shader" id="shaderFrame">
+      <div class="head"><span class="chips" role="tablist"><button class="chip on" id="viewCode" type="button">Code</button><button class="chip" id="viewNodes" type="button">Nodes</button></span>
+        <span class="chips" id="progs" role="tablist" aria-label="Program"></span>
+        <span class="r"><span id="fileName">untitled.inoscula</span><button id="refBtn" class="chip" type="button">Reference</button><button class="chip swap" type="button" title="Swap this panel with the parameters">Swap</button></span></div>
+      <div class="opts" id="kitBar">
+        <span>Kitbash: mix in</span>
+        <select id="kitLook" class="chip" aria-label="Look to mix in"></select>
+        <label for="kitMask">where</label>
+        <select id="kitMask" class="chip">
+          <option value="patches">in patches</option><option value="everywhere">everywhere</option><option value="light">in the light</option><option value="shadow">in shadow</option>
+          <option value="top">on top</option><option value="edges">at the edges</option><option value="crevices">in crevices</option>
+        </select>
+        <button id="kitBtn" class="chip" type="button">Mix in</button>
+      </div>
+      <div class="progbar" id="progBar" hidden>
+        <div class="opts" id="partOpts" hidden></div>
+        <div class="how"><p id="how"></p><span class="r"><button id="copyBtn" class="btn solid small" type="button">Copy</button><button id="saveBtn" class="btn small" type="button" hidden>Save file</button></span></div>
+      </div>
+      <div class="editor" id="editorBox">
+        <div class="gutter" id="gutter" aria-hidden="true"></div>
+        <div class="code">
+          <pre id="hl" aria-hidden="true"></pre>
+          <textarea id="src" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Inoscula shader code"></textarea>
+        </div>
+      </div>
+      <pre class="dump code-out" id="dump" hidden></pre>
+      <div class="nodes" id="nodesBox" hidden aria-label="Node graph">
+        <div class="zoom"><button class="chip" type="button" id="zOut" aria-label="Zoom out">&minus;</button><button class="chip" type="button" id="zIn" aria-label="Zoom in">+</button><button class="chip" type="button" id="zFit">Fit</button><button class="chip" type="button" id="lvlBtn" hidden>Material level</button></div>
+        <svg class="graph" id="graphSvg" xmlns="http://www.w3.org/2000/svg"><g id="graphCam"></g></svg>
+        <div class="legend" id="graphLegend"></div>
+      </div>
+      <div id="status" class="status">Compiling&hellip;</div>
+      <div class="travel" id="travel"><div class="notes" id="notes" aria-label="How it travels"></div></div>
     </section>
   </div>
-
-  <section class="frame out" aria-label="Exports">
-    <div class="tabs" id="tabs" role="tablist"></div>
-    <div class="opts" id="unrealOpts" hidden>
-      <label><input type="radio" name="ueAs" value="material" checked> Material</label>
-      <label><input type="radio" name="ueAs" value="function"> Material Function (to plug into your own materials and layers)</label>
-      <label><input type="checkbox" id="ueSub"> Substrate</label>
-    </div>
-    <div class="how"><p id="how"></p><span class="r"><button id="copyBtn" class="btn solid" type="button">Copy</button><button id="saveBtn" class="btn" type="button" hidden>Save file</button></span></div>
-    <div class="split"><pre class="dump" id="dump"></pre><div class="notes" id="notes" aria-label="How it travels"></div></div>
-  </section>
+  <div class="hsplit" id="hsplitBelow" role="separator" aria-orientation="horizontal" aria-label="Drag to resize the shader panel" tabindex="0"></div>
 </div>
 
+<div class="sheet" id="liveSheet" hidden>
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="liveTitle" style="width: min(760px, 100%);">
+    <div class="head"><span id="liveTitle"><b>Live link</b>: move a slider in one program, it moves in all of them</span><button class="chip" id="liveClose" type="button">Close</button></div>
+    <div class="howto">
+      <div class="st"><div><b>Start the bridge on your computer.</b> In the inoscula folder (Node 22.18 or newer):
+        <pre>node bin/inoscula-live.ts</pre>It stays running and passes every parameter change between the programs below. Ports: 9420 for this Studio and web pages, 9421 Blender, 9422 Godot, 9000 OSC out, 9419 changes coming in.</div></div>
+      <div class="st"><div><b>Blender.</b> Build the material first (Blender tab, Run Script). Then Edit, Preferences, Add-ons, Install from Disk, pick <code>importers/inoscula_live_blender.py</code> and tick it. Every Inoscula material in the open file follows the link both ways.</div></div>
+      <div class="st"><div><b>Godot.</b> Use the Godot export as a ShaderMaterial, then add <code>importers/inoscula_live.gd</code> to any node in the scene. It is a tool script, so the link works in the editor and while the game runs.</div></div>
+      <div class="st"><div><b>Unreal.</b> Turn on the Remote Control API plugin, make a Material Instance of the Inoscula material, and start the bridge with its path:
+        <pre>node bin/inoscula-live.ts --unreal http://localhost:30010 --unreal-instance /Game/Inoscula/MI_[Name]</pre></div></div>
+      <div class="st"><div><b>RICO Engine, or anything that speaks OSC,</b> receives <code>/inoscula/[shader]/[parameter]</code> on port 9000. Change it with <code>--osc [port]</code>.</div></div>
+      <div class="st"><div><b>Connect this Studio.</b> Open <code>inoscula-studio.html</code> from your computer (a hosted page may not be allowed to reach your computer), then press Connect. Parameter names match by their labels, so keep the same shader name in every program.</div></div>
+    </div>
+    <div class="foot"><span id="liveSheetState">Not linked.</span><button class="btn solid" id="liveConnect" type="button">Connect</button></div>
+  </div>
+</div>
+<div class="sheet" id="lookSheet" hidden>
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="lookTitle" style="width: min(520px, 100%);">
+    <div class="head"><span id="lookTitle"><b>Save as look</b></span></div>
+    <div class="how"><p>Keeps this shader, with the parameter values you set, in the look list under <b>My looks</b>. It is stored in this browser; use Save to keep a file as well.</p></div>
+    <div class="foot" style="justify-content: stretch;"><input id="lookName" class="chip" style="flex: 1 1 auto; text-transform: none; font-family: var(--font); padding: 6px 8px;" placeholder="Name" aria-label="Look name" maxlength="40"></div>
+    <div class="foot"><span id="lookMsg"></span><button class="btn ghost" id="lookDelete" type="button" hidden>Delete</button><button class="btn ghost" id="lookCancel" type="button">Cancel</button><button class="btn solid" id="lookOk" type="button">Save</button></div>
+  </div>
+</div>
 <div class="sheet" id="sheet" hidden>
   <div class="box" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
     <div class="head"><span id="sheetTitle"><b>Import a graph</b></span></div>
@@ -367,14 +450,21 @@ cam.lookAt(0, 0, 0)
 const sun = new THREE.DirectionalLight(0xffffff, 2.2)
 sun.castShadow = true
 sun.shadow.mapSize.set(2048, 2048)
-sun.shadow.camera.left = sun.shadow.camera.bottom = -3; sun.shadow.camera.right = sun.shadow.camera.top = 3
-sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02
+sun.shadow.camera.left = sun.shadow.camera.bottom = -5; sun.shadow.camera.right = sun.shadow.camera.top = 5
+sun.shadow.bias = -0.0002; sun.shadow.normalBias = 0.03; sun.shadow.camera.near = 1; sun.shadow.camera.far = 14
 scene.add(sun, sun.target)
 let lightYaw = -0.7, lightPitch = 0.75
 const holder = new THREE.Group(); scene.add(holder)
 holder.rotation.set(0.25, 0.5, 0)
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ opacity: 0.45 }))
 ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground)
+// contact shade: the soft darkening where an object meets the floor, which every program gets from bounce light
+const contact = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), gr = x.createRadialGradient(64, 64, 0, 64, 64, 64)
+  gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.3, 'rgba(0,0,0,0.6)'); gr.addColorStop(0.6, 'rgba(0,0,0,0.2)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, 128, 128)
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, opacity: 0.6, toneMapped: false }))
+  m.rotation.x = -Math.PI / 2; m.renderOrder = 1; scene.add(m); return m
+})()
 
 // lighting environments, made here so nothing is downloaded: a sky dome with soft panels, filtered for reflections
 const pmrem = new THREE.PMREMGenerator(renderer)
@@ -462,6 +552,11 @@ const shapeCache = {}
 function placeOnFloor(obj) {
   const box = new THREE.Box3().setFromObject(obj)
   ground.position.y = box.min.y - 0.001
+  // the contact shade covers the part that touches the floor
+  const foot = new THREE.Box3()
+  obj.traverse((o) => { if (o.isMesh && !o.userData.inosculaOutline && !o.userData.inosculaShells) { const b = new THREE.Box3().setFromObject(o); if (b.min.y < box.min.y + 0.25) foot.union(b) } })
+  const fs = foot.isEmpty() ? box.getSize(new THREE.Vector3()) : foot.getSize(new THREE.Vector3())
+  contact.scale.set(Math.max(0.3, fs.x * 0.9), Math.max(0.3, fs.z * 0.9), 1); contact.position.set(foot.isEmpty() ? 0 : (foot.min.x + foot.max.x) / 2, box.min.y + 0.002, foot.isEmpty() ? 0 : (foot.min.z + foot.max.z) / 2)
   sun.target.position.set(0, 0, 0)
 }
 function setShape(n) {
@@ -498,7 +593,10 @@ function applyMaterial() {
   for (const o of meshes) {
     o.material = material
     o.onBeforeRender = () => { if (uniforms?.inoscula_object_size) { uniforms.inoscula_object_size.value = osize; material.uniformsNeedUpdate = true } }
-    if (outlineMat && !o.userData.inosculaCards && !o.userData.inosculaShells) { const e = new THREE.Mesh(o.geometry, outlineMat); e.userData.inosculaOutline = true; o.add(e) }
+    if (outlineMat && !o.userData.inosculaCards && !o.userData.inosculaShells) {
+      const g = (o.userData.inosculaSmooth ??= (() => { const c = o.geometry.clone(); if (!c.attributes.normal) c.computeVertexNormals(); c.setAttribute('normal', new THREE.BufferAttribute(smoothNormals(c.attributes.position.array, c.attributes.normal.array), 3)); return c })())
+      const e = new THREE.Mesh(g, outlineMat); e.userData.inosculaOutline = true; o.add(e)
+    }
   }
 }
 
@@ -513,7 +611,7 @@ new ResizeObserver(resize).observe(view)
 
 let drag = null, lightMode = false
 $('lightBtn').addEventListener('click', () => { lightMode = !lightMode; $('lightBtn').classList.toggle('on', lightMode); $('lightBtn').setAttribute('aria-pressed', lightMode); $('hint').textContent = lightMode ? 'Drag to move the light.' : 'Drag to turn the object. Scroll to zoom.' })
-$('groundBtn').addEventListener('click', () => { ground.visible = !ground.visible; $('groundBtn').classList.toggle('on', ground.visible); $('groundBtn').setAttribute('aria-pressed', ground.visible) })
+$('groundBtn').addEventListener('click', () => { ground.visible = !ground.visible; contact.visible = ground.visible; $('groundBtn').classList.toggle('on', ground.visible); $('groundBtn').setAttribute('aria-pressed', ground.visible) })
 view.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, light: lightMode || e.shiftKey }; view.setPointerCapture(e.pointerId); view.style.cursor = 'grabbing' })
 view.addEventListener('pointermove', (e) => {
   if (!drag) return
@@ -742,16 +840,30 @@ $('cardsBtn').addEventListener('click', () => {
 
 // ------------------------------------------------------------- compile
 let graph = null, ir = null, values = {}, uniforms = null, lfo = {}
-const tabsSpec = [
-  ['Blender', 'blender.py', () => toBlender(ir), 'Blender: Text Editor, open this file, Run Script. Real shader nodes inside the group "Inoscula ' + (ir?.name ?? '') + '", every parameter on the group, keyframable. To bring changes back: importers/blender_to_inoscula.py.', 'blender'],
-  ['Godot', 'gdshader', () => toGodot(ir), 'Godot: save as .gdshader and make a ShaderMaterial with it; every parameter is in the Inspector and can be animated with an AnimationPlayer. Bring changes back with: node bin/inoscula-pull.ts material.tres this.gdshader', 'godot'],
-  ['Unreal', 'unreal.py', () => toUnreal(ir, { as: document.querySelector('input[name=ueAs]:checked').value, substrate: $('ueSub').checked }), 'Unreal: Tools, Execute Python Script, this file (needs the Python Editor Script Plugin). Parameters live in Material Instances and Sequencer. Bring changes back: select the asset and run importers/inoscula_from_unreal.py.', 'unreal'],
-  ['Unity', 'unity.hlsl', () => toUnity(ir), 'Unity Shader Graph: add a Custom Function node, Type File, Source this file. The first lines list the inputs and outputs to wire.', 'unity'],
-  ['RICO', 'three.json', () => { const t = toThree(ir); return JSON.stringify({ name: ir.name, lit: t.lit, uniforms: t.uniforms, fragmentShader: t.fragmentShader }, null, 2) }, 'RICO Engine: load the .inoscula.json with inosculaMaterial(THREE, graph); route any parameter from MIDI, OSC or Twin Ctrl with look.set(name, value). Inoscula Live also sends /inoscula/<shader>/<parameter> as OSC.', 'rico'],
-  ['Outline', 'outline.txt', () => ir.outline ? `// ---- Godot: save as ${fileBase()}_outline.gdshader, set it as the material's Next Pass\n${toGodotOutline(ir)}\n// ---- Unity: save as ${fileBase()}_outline.shader, add it as a second material\n${toUnityOutline(ir)}` : 'This shader has no outline. Add one with, for example:\n\n  uniform float lineWidth = 0.01;  // @range 0 0.05 @label Outline Width\n  ...\n  outline = lineWidth;\n  outline_color = vec3(0.02);\n  outline_breakup = 0.3;   // 0 solid, up to 1 broken and inked', 'The outline is drawn outside the silhouette: the mesh again, inside out and pushed out along its normals, with noise breaking the line up. Blender and Unreal get it automatically from their tabs (a Solidify modifier, and an Overlay Material). Godot and Unity use the two small shaders here. RICO: look.addOutline(mesh).', 'rico'],
-  ['Graph', 'inoscula.json', () => JSON.stringify(graph, null, 2), 'The Inoscula graph: the open format every tool reads and every export carries inside it. Keep it with your project; it is the source of truth.', 'rico'],
-]
-let tab = 0
+const PARTS = {
+  godot: [['vs', 'VisualShader nodes (.tres)'], ['code', 'Shader code (.gdshader)'], ['outline', 'Outline pass']],
+  unreal: [['native', 'Native nodes'], ['custom', 'One Custom node'], ['function', 'Material Function']],
+  unity: [['main', 'Custom Function file'], ['outline', 'Outline pass']],
+}
+const partOf = {}
+const part = () => partOf[prog] ?? PARTS[prog]?.[0][0]
+let ueSub = false
+const PROGS = {
+  inoscula: { label: 'Inoscula', tgt: 'rico' },
+  blender: { label: 'Blender', ext: 'blender.py', tgt: 'blender', make: () => toBlender(ir),
+    how: () => `Blender: Text Editor, open or paste this, Run Script. It builds the nodes shown in Nodes, inside the group "Inoscula ${ir?.name ?? ''}", every parameter on the group and keyframable.${ir?.outline ? ' The outline comes with it (a Solidify modifier and a second material).' : ''} Bring changes back with importers/blender_to_inoscula.py.` },
+  godot: { label: 'Godot', tgt: 'godot', ext: () => ({ vs: 'tres', code: 'gdshader', outline: 'outline.gdshader' })[part()], make: () => ({ vs: () => toGodotVisual(ir), code: () => toGodot(ir), outline: () => toGodotOutline(ir) })[part()](),
+    how: () => ({ vs: 'Godot: save as a .tres (the node graph shown in Nodes) and drop it on a ShaderMaterial. Every parameter is in the Inspector and can be animated with an AnimationPlayer.', code: 'Godot: the same shader as code. Save as .gdshader and make a ShaderMaterial with it. Bring changes back with: node bin/inoscula-pull.ts material.tres this.gdshader', outline: 'Godot outline: save as a .gdshader, make a ShaderMaterial with it and set it as the main material\'s Next Pass. Its width, colour and breakup follow the same parameters.' })[part()] },
+  unreal: { label: 'Unreal', ext: 'unreal.py', tgt: 'unreal', make: () => part() === 'native' ? toUnrealNative(ir) : toUnreal(ir, { as: part() === 'function' ? 'function' : 'material', substrate: ueSub }),
+    how: () => `Unreal: Tools, Execute Python Script, this file (needs the Python Editor Script Plugin). ${part() === 'native' ? 'It builds the expressions shown in Nodes.' : 'One Custom node holds the whole shader, wired to real parameters.'} Parameters live in Material Instances and Sequencer.${ir?.outline ? ' The outline comes with it as an Overlay Material.' : ''} Bring changes back: select the asset and run importers/inoscula_from_unreal.py.` },
+  unity: { label: 'Unity', tgt: 'unity', ext: () => part() === 'outline' ? 'outline.shader' : 'unity.hlsl', make: () => part() === 'outline' ? toUnityOutline(ir) : toUnity(ir),
+    how: () => part() === 'outline' ? 'Unity outline: save as a .shader and add it to the renderer as a second material.' : 'Unity Shader Graph: add a Custom Function node, Type File, Source this file, and wire the inputs and outputs listed at the top. Nodes shows the same shader built from Shader Graph nodes, to build or study by hand.' },
+  rico: { label: 'RICO', ext: 'three.json', tgt: 'rico', make: () => { const t = toThree(ir); return JSON.stringify({ name: ir.name, lit: t.lit, uniforms: t.uniforms, fragmentShader: t.fragmentShader }, null, 2) },
+    how: () => `RICO Engine: load the .inoscula.json with inosculaMaterial(THREE, graph) and set any parameter from MIDI, OSC or Twin Ctrl with look.set(name, value).${ir?.outline ? ' Outline: look.addOutline(mesh).' : ''}` },
+  graph: { label: 'Graph', ext: 'inoscula.json', tgt: 'rico', codeOnly: true, make: () => JSON.stringify(graph, null, 2),
+    how: () => 'The Inoscula graph: the open format every program reads and every export carries inside it. Keep it with your project.' },
+}
+let prog = 'inoscula', mode = 'code'
 const isTopLevel = window.self === window.top
 function compile() {
   try {
@@ -768,8 +880,7 @@ function compile() {
     status.className = 'status ok'
     const lt = ir.lit ? 'lit by each tool\'s renderer' : 'unlit, the same colour everywhere'
     status.innerHTML = `<b>Ready.</b> ${esc(ir.name)}: ${ir.steps.length} nodes, ${ir.params.length} parameter${ir.params.length === 1 ? '' : 's'}, ${lt}.`
-    showTab(tab)
-    if (!$('nodesBox').hidden) drawNodes()
+    refresh()
   } catch (e) {
     const msg = String(e.message ?? e)
     badLine = e.line ?? (/^Line (\d+)/.exec(msg)?.[1] | 0)
@@ -832,50 +943,138 @@ const toL = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4
 const hex = (v) => '#' + v.map((c) => Math.round(Math.max(0, Math.min(1, toS(c))) * 255).toString(16).padStart(2, '0')).join('')
 const unhex = (h) => [1, 3, 5].map((i) => toL(parseInt(h.slice(i, i + 2), 16) / 255))
 
-const rows = {}
+const rows = {}, bypass = {}
 function setParam(id, v, from) {
   values[id] = v; setUniform(id, v)
   const r = rows[id]
-  if (r) { if (Array.isArray(v)) { r.inp.value = hex(v); r.out.textContent = r.inp.value.slice(1).toUpperCase() } else { r.inp.value = v; r.out.textContent = (+v).toFixed(2) } }
+  if (r) { if (Array.isArray(v)) { r.inp.value = hex(v); r.out.textContent = r.inp.value.slice(1).toUpperCase() } else { r.inp.value = v; r.out.textContent = (+v).toFixed(2); r.seg?.forEach((b) => b.classList.toggle('on', +b.dataset.v === Math.round(v))) } }
   if (from !== 'live') liveSend(id, v)
+}
+// ---- outline controls: they change the shader code itself, so every export gets the same outline
+const OUTLINE_STYLES = [['Solid', 0], ['Broken', 0.35], ['Inked', 0.7]]
+const outlineLine = (k) => new RegExp(`^[ \\t]*${k}\\s*=\\s*([^;]*);[^\\n]*\\n?`, 'm')
+function editSource(fn) {
+  const before = src.value, after = fn(before)
+  if (after === before) return
+  src.value = after; store.set('inoscula-draft', src.value); compile()
+}
+function mainEnd(text) { return text.lastIndexOf('}') }
+function addUniform(text, line) {
+  const m = /^[ \t]*uniform[^\n]*\n(?![\s\S]*^[ \t]*uniform)/m.exec(text)
+  if (m) return text.slice(0, m.index + m[0].length) + line + '\n' + text.slice(m.index + m[0].length)
+  const v = /^[ \t]*(?:float|vec3|void)\s+\w+\s*\(/m.exec(text)
+  const at = v ? v.index : 0
+  return text.slice(0, at) + line + '\n\n' + text.slice(at)
+}
+function setOutline(on) {
+  editSource((t) => {
+    if (!on) {
+      for (const k of ['outline_rings', 'outline_breakup', 'outline_color', 'outline']) t = t.replace(outlineLine(k), '')
+      return t
+    }
+    if (outlineLine('outline').test(t)) return t
+    if (!/uniform\s+float\s+lineWidth\b/.test(t)) t = addUniform(t, 'uniform float lineWidth = 0.012;               // @range 0 0.05 @label Outline Width')
+    if (!/uniform\s+vec3\s+lineColor\b/.test(t)) t = addUniform(t, 'uniform vec3 lineColor = vec3(0.02, 0.02, 0.03); // @color @label Outline Colour')
+    const e = mainEnd(t)
+    return t.slice(0, e) + '  outline = lineWidth;\n  outline_color = lineColor;\n  outline_breakup = 0.35;\n' + t.slice(e)
+  })
+}
+function setOutlineValue(k, v) {
+  editSource((t) => {
+    if (outlineLine(k).test(t)) return t.replace(outlineLine(k), (m, old) => m.replace(old, v))
+    const e = mainEnd(t)
+    return t.slice(0, e) + `  ${k} = ${v};\n` + t.slice(e)
+  })
 }
 function buildParams() {
   const box = $('params')
   box.innerHTML = ''
   for (const k in rows) delete rows[k]
-  const sect = (t) => { const d = document.createElement('div'); d.className = 'sect'; d.textContent = t; box.append(d) }
-  const colors = ir.params.filter((p) => p.type === 'color'), nums = ir.params.filter((p) => p.t === 'float'), vecs = ir.params.filter((p) => p.type === 'vector')
-  if (colors.length) sect('Colours')
-  for (const p of colors) {
+  const sect = (t, where = box) => { const d = document.createElement('div'); d.className = 'sect'; d.textContent = t; where.append(d); return d }
+  const isLine = (p) => /^(outline|line)/i.test(p.id) || /^outline/i.test(p.label ?? '')
+  const colorRow = (p) => {
     const row = document.createElement('div'); row.className = 'row'
     const id = 'p-' + p.id
-    row.innerHTML = `<label for="${id}">${esc(p.label ?? p.id)}</label><input type="color" id="${id}"><output></output><span></span>`
+    row.innerHTML = `<label for="${id}">${esc(p.label ?? p.id)}</label><input type="color" id="${id}"><output></output><span></span><span></span>`
     const inp = row.querySelector('input'), out = row.querySelector('output')
     rows[p.id] = { inp, out }
     inp.value = hex(values[p.id]); out.textContent = inp.value.slice(1).toUpperCase()
     inp.addEventListener('input', () => setParam(p.id, unhex(inp.value)))
     box.append(row)
   }
-  if (nums.length) sect('Controls')
-  for (const p of nums) {
-    const row = document.createElement('div'); row.className = 'row'
-    const id = 'p-' + p.id
+  const numRow = (p) => {
     const lo = p.min ?? Math.min(0, p.default * 2), hi = p.max ?? Math.max(1, p.default * 2 || 1)
-    row.innerHTML = `<label for="${id}">${esc(p.label ?? p.id)}</label><input type="range" id="${id}" min="${lo}" max="${hi}" step="${(hi - lo) / 400}"><output></output><button type="button" class="lfo" title="Animate: swing this between its limits" aria-label="Animate ${esc(p.label ?? p.id)}">&#8767;</button>`
-    const inp = row.querySelector('input'), out = row.querySelector('output'), b = row.querySelector('.lfo')
+    const id = 'p-' + p.id, name = esc(p.label ?? p.id)
+    // a few whole numbers (tones, bands, values): buttons instead of a slider
+    if (Number.isInteger(lo) && Number.isInteger(hi) && hi - lo <= 8 && hi > lo && /tone|band|value|level|step|complex|count|ring/i.test(p.label ?? p.id)) {
+      const row = document.createElement('div'); row.className = 'rowb'
+      row.innerHTML = `<span>${name}</span><span class="seg" role="group" aria-label="${name}"></span>`
+      const seg = row.querySelector('.seg'), btns = []
+      for (let v = lo; v <= hi; v++) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = v; b.dataset.v = v
+        b.classList.toggle('on', Math.round(values[p.id]) === v)
+        b.addEventListener('click', () => { delete lfo[p.id]; setParam(p.id, v) })
+        seg.append(b); btns.push(b)
+      }
+      rows[p.id] = { inp: { value: 0 }, out: { textContent: '' }, seg: btns }
+      box.append(row); return
+    }
+    const row = document.createElement('div'); row.className = 'row'
+    row.innerHTML = `<label for="${id}">${name}</label><input type="range" id="${id}" min="${lo}" max="${hi}" step="${(hi - lo) / 400}"><output></output><button type="button" class="byp" title="Off: set to its lowest. Press again to bring the value back" aria-label="Switch off ${name}">OFF</button><button type="button" class="lfo" title="Animate: swing this between its limits" aria-label="Animate ${name}">&#8767;</button>`
+    const inp = row.querySelector('input'), out = row.querySelector('output'), b = row.querySelector('.lfo'), off = row.querySelector('.byp')
     rows[p.id] = { inp, out }
     inp.value = values[p.id]; out.textContent = (+values[p.id]).toFixed(2)
-    inp.addEventListener('input', () => { delete lfo[p.id]; b.classList.remove('on'); setParam(p.id, +inp.value) })
+    const offState = () => { const on = p.id in bypass; off.classList.toggle('on', on); row.classList.toggle('off', on) }
+    inp.addEventListener('input', () => { delete lfo[p.id]; delete bypass[p.id]; offState(); b.classList.remove('on'); setParam(p.id, +inp.value) })
     if (lfo[p.id]) b.classList.add('on')
+    offState()
     b.addEventListener('click', () => { if (lfo[p.id]) { delete lfo[p.id]; b.classList.remove('on') } else { lfo[p.id] = { lo, hi, t0: t }; b.classList.add('on') } })
+    off.addEventListener('click', () => {
+      if (p.id in bypass) { setParam(p.id, bypass[p.id]); delete bypass[p.id] } else { bypass[p.id] = values[p.id]; delete lfo[p.id]; b.classList.remove('on'); setParam(p.id, lo) }
+      offState()
+    })
     box.append(row)
+  }
+  const seg = (label, items, active, onPick) => {
+    const row = document.createElement('div'); row.className = 'rowb'
+    row.innerHTML = `<span>${esc(label)}</span><span class="seg" role="group" aria-label="${esc(label)}"></span>`
+    for (const [t, v] of items) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'chip' + (active(v) ? ' on' : ''); b.textContent = t
+      b.setAttribute('aria-pressed', active(v)); b.addEventListener('click', () => onPick(v)); row.querySelector('.seg').append(b)
+    }
+    box.append(row)
+  }
+  const colors = ir.params.filter((p) => p.type === 'color' && !isLine(p)), nums = ir.params.filter((p) => p.t === 'float' && !isLine(p)), vecs = ir.params.filter((p) => p.type === 'vector')
+  if (colors.length) sect('Colours')
+  for (const p of colors) colorRow(p)
+  if (nums.length) sect('Controls')
+  for (const p of nums) numRow(p)
+  // ---- outline: drawn outside the silhouette in every program
+  sect('Outline')
+  const lineParams = ir.params.filter(isLine)
+  if (graph?.shells) {
+    // looks with painted rim and offset outlines draw them with their own parameters
+    for (const p of lineParams) (p.type === 'color' ? colorRow : numRow)(p)
+    seg('Line style', [['Solid', 0], ['Broken', 1], ['Fragments', 2]], () => false, (v) => {
+      const br = ir.params.find((p) => /break/i.test(p.id)), fr = ir.params.find((p) => /frag/i.test(p.id))
+      if (br) setParam(br.id, [0, 0.45, 0.35][v]); if (fr) setParam(fr.id, [0, 0, 0.7][v])
+    })
+  } else {
+    const has = Boolean(ir.outline)
+    seg('Outline', [['Off', false], ['On', true]], (v) => v === has, (v) => setOutline(v))
+    if (has) {
+      const br = ir.outline.breakup?.k === 'lit' ? ir.outline.breakup.v : null
+      if (br !== null) seg('Line style', OUTLINE_STYLES, (v) => Math.abs(v - br) < 0.06, (v) => setOutlineValue('outline_breakup', v.toFixed(2)))
+      seg('Floating lines', [['0', 0], ['1', 1], ['2', 2], ['3', 3], ['4', 4]], (v) => (ir.outline.rings ?? 0) === v, (v) => setOutlineValue('outline_rings', v + '.0'))
+      for (const p of lineParams) (p.type === 'color' ? colorRow : numRow)(p)
+    }
   }
   if (vecs.length) sect('Directions')
   for (const p of vecs) {
     for (const [k, axis] of ['x', 'y', 'z'].entries()) {
       const row = document.createElement('div'); row.className = 'row'
       const id = `p-${p.id}-${axis}`
-      row.innerHTML = `<label for="${id}">${esc(p.label ?? p.id)} ${axis}</label><input type="range" id="${id}" min="-1" max="1" step="0.005"><output></output><span></span>`
+      row.innerHTML = `<label for="${id}">${esc(p.label ?? p.id)} ${axis}</label><input type="range" id="${id}" min="-1" max="1" step="0.005"><output></output><span></span><span></span>`
       const inp = row.querySelector('input'), out = row.querySelector('output')
       inp.value = values[p.id][k]; out.textContent = (+inp.value).toFixed(2)
       inp.addEventListener('input', () => { const v = [...values[p.id]]; v[k] = +inp.value; out.textContent = (+inp.value).toFixed(2); setParam(p.id, v) })
@@ -885,109 +1084,238 @@ function buildParams() {
   if (!ir.params.length) { const d = document.createElement('div'); d.className = 'sub'; d.textContent = 'No parameters yet. Add one with: uniform float speed = 1.0; // @range 0 4'; box.append(d) }
 }
 
-// ------------------------------------------------------------- node view
-function showView(v) {
-  $('editorBox').hidden = v !== 'code'; $('nodesBox').hidden = v !== 'nodes'
-  $('viewCode').classList.toggle('on', v === 'code'); $('viewNodes').classList.toggle('on', v === 'nodes')
-  if (v === 'nodes') drawNodes()
+// ------------------------------------------------------------- shader panel: code or nodes, for each program
+for (const [k, p] of Object.entries(PROGS)) {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = p.label; b.dataset.p = k; b.setAttribute('role', 'tab')
+  b.addEventListener('click', () => { prog = k; refresh() }); $('progs').append(b)
 }
+function showView(v) { mode = v; refresh() }
 $('viewCode').addEventListener('click', () => showView('code'))
 $('viewNodes').addEventListener('click', () => showView('nodes'))
-function drawNodes() {
-  if (!ir) return
-  const lines = lineMap.get(graph) ?? new Map()
-  const byId = new Map(ir.steps.map((s) => [s.id, s]))
-  const depth = new Map(), W = 150, GAP = 46
-  const dOf = (s) => {
-    if (depth.has(s.id)) return depth.get(s.id)
-    let d = 0
-    for (const a of s.args) if (a.k === 'ref') { const base = a.id.replace(/_(x|y|z|color|position)$/, ''); const t = byId.get(base); if (t) d = Math.max(d, dOf(t) + 1) }
-    depth.set(s.id, d); return d
-  }
-  ir.steps.forEach(dOf)
-  const cols = []
-  for (const s of ir.steps) { const d = depth.get(s.id); (cols[d] ??= []).push(s) }
-  const pos = new Map(), outs = ['color', 'roughness', 'metallic', 'bump', 'emission', 'alpha']
-  const H = (s) => 30 + Math.max(1, s.args.length) * 14
-  let maxY = 0
-  cols.forEach((c, ci) => { let y = 16; for (const s of c) { pos.set(s.id, { x: 16 + ci * (W + GAP), y }); y += H(s) + 14 } maxY = Math.max(maxY, y) })
-  const outX = 16 + cols.length * (W + GAP)
-  const outList = [['color', ir.color], ['alpha', ir.alpha], ...(ir.lit ? [['roughness', ir.roughness], ['metallic', ir.metallic], ['bump', ir.bump], ['emission', ir.emission], ...Object.entries(ir.layers)] : [])].filter(([, a]) => a && a.k === 'ref')
-  const outH = 30 + outList.length * 14
-  const width = outX + W + 16, height = Math.max(maxY, outH + 32) + 16
-  const label = (s) => {
-    const nm = s.node.replace(/_\d+$/, '')
-    return s.op === 'param' ? s.set.id : s.op === 'value' ? 'value' : nm === s.op ? s.op : `${nm} · ${s.op}`
-  }
-  let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`
-  const wires = [], boxes = []
-  const portY = (s, i) => pos.get(s.id).y + 30 + i * 14 - 4
-  for (const s of ir.steps) {
-    const P = pos.get(s.id), src = OPS[s.op].source
-    s.args.forEach((a, i) => {
-      if (a.k !== 'ref') return
-      const base = a.id.replace(/_(x|y|z|color|position)$/, ''), from = byId.get(base)
-      if (!from) return
-      const F = pos.get(from.id), x1 = F.x + W, y1 = F.y + 15, x2 = P.x, y2 = portY(s, i)
-      wires.push(`<path class="w${a.type === 'vec3' ? ' v' : ''}" d="M${x1} ${y1} C${x1 + 30} ${y1} ${x2 - 30} ${y2} ${x2} ${y2}"/>`)
-    })
-    const names = OPS[s.op].ins.map(([n]) => n)
-    const argText = s.args.map((a, i) => `<text x="${P.x + 8}" y="${P.y + 30 + i * 14}">${esc(names[i])}${a.k === 'lit' ? ` <tspan class="lit">${esc(typeof a.v === 'number' ? (+a.v.toFixed(3)) : 'vec3')}</tspan>` : ''}</text>`).join('')
-    boxes.push(`<g class="n${src ? ' src' : ''}" data-line="${lines.get(s.node) ?? 0}" tabindex="0"><rect x="${P.x}" y="${P.y}" width="${W}" height="${H(s)}"/><text class="title" x="${P.x + 8}" y="${P.y + 16}">${esc(label(s).slice(0, 19))}</text>${argText}</g>`)
-  }
-  boxes.push(`<g class="n out"><rect x="${outX}" y="16" width="${W}" height="${outH}"/><text class="title" x="${outX + 8}" y="32">${ir.lit ? 'surface · lit' : 'surface · unlit'}</text>${outList.map(([n], i) => `<text x="${outX + 8}" y="${46 + i * 14}">${n}</text>`).join('')}</g>`)
-  outList.forEach(([, a], i) => {
-    const base = a.id.replace(/_(x|y|z|color|position)$/, ''), from = byId.get(base)
-    if (!from) return
-    const F = pos.get(from.id), x1 = F.x + W, y1 = F.y + 15, x2 = outX, y2 = 42 + i * 14
-    wires.push(`<path class="w${a.type === 'vec3' ? ' v' : ''}" d="M${x1} ${y1} C${x1 + 30} ${y1} ${x2 - 30} ${y2} ${x2} ${y2}"/>`)
-  })
-  svg += wires.join('') + boxes.join('') + '</svg>'
-  const box = $('nodesBox')
-  box.innerHTML = svg
-  for (const g of box.querySelectorAll('g.n[data-line]')) {
-    const go = () => { const n = +g.dataset.line; if (n) goToLine(n) }
-    g.addEventListener('dblclick', go)
-    g.addEventListener('keydown', (e) => { if (e.key === 'Enter') go() })
-    g.addEventListener('click', () => { for (const x of box.querySelectorAll('g.sel')) x.classList.remove('sel'); g.classList.add('sel') })
-  }
+function partBar() {
+  const box = $('partOpts'), list = PARTS[prog]
+  box.hidden = !list || mode !== 'code'
+  if (!list) return
+  const has = (k) => k !== 'outline' || ir?.outline
+  box.innerHTML = list.filter(([k]) => has(k)).map(([k, t]) => `<label><input type="radio" name="part" value="${k}"${part() === k ? ' checked' : ''}> ${t}</label>`).join('') +
+    (prog === 'unreal' && part() !== 'native' && ir?.lit ? `<label><input type="checkbox" id="ueSub"${ueSub ? ' checked' : ''}> Substrate</label>` : '')
+  for (const r of box.querySelectorAll('input[name=part]')) r.addEventListener('change', () => { partOf[prog] = r.value; refresh() })
+  box.querySelector('#ueSub')?.addEventListener('change', (e) => { ueSub = e.target.checked; refresh() })
 }
-// drag to pan the node view
-{
-  const box = $('nodesBox'); let p = null
-  box.addEventListener('pointerdown', (e) => { if (e.target.closest('g.n')) return; p = { x: e.clientX, y: e.clientY, l: box.scrollLeft, t: box.scrollTop }; box.setPointerCapture(e.pointerId) })
-  box.addEventListener('pointermove', (e) => { if (!p) return; box.scrollLeft = p.l - (e.clientX - p.x); box.scrollTop = p.t - (e.clientY - p.y) })
-  box.addEventListener('pointerup', () => { p = null })
-}
-
-// ------------------------------------------------------------- exports
-for (const [i, [label]] of tabsSpec.entries()) {
-  const b = document.createElement('button'); b.type = 'button'; b.className = 'tab'; b.textContent = label; b.setAttribute('role', 'tab')
-  b.addEventListener('click', () => showTab(i)); $('tabs').append(b)
-}
-for (const el of [...document.querySelectorAll('input[name=ueAs]'), $('ueSub')]) el.addEventListener('change', () => showTab(tab))
 let current = ''
-function showTab(i) {
-  tab = i
-  ;[...$('tabs').children].forEach((b, k) => { b.classList.toggle('on', k === i); b.setAttribute('aria-selected', k === i) })
-  $('unrealOpts').hidden = tabsSpec[i][0] !== 'Unreal'
+// colour the exported code a little: comments, strings, numbers
+function hlPlain(text) {
+  return text.replace(/((?:\/\/|#)[^\n]*)|("(?:[^"\\\n]|\\.)*")|(\b\d+\.?\d*(?:e[+-]?\d+)?\b)|([&<>])/g, (m, com, str, num, ch) =>
+    com ? (m.startsWith('#') && /^#(?:if|endif|define|include|pragma)/.test(m) ? `<span class="t-kw">${esc(com)}</span>` : `<span class="t-com">${esc(com)}</span>`) : str ? `<span class="t-str">${esc(str)}</span>` : num ? `<span class="t-num">${num}</span>` : esc(ch))
+}
+function refresh() {
+  const P = PROGS[prog]
+  if (mode === 'nodes' && P.codeOnly) prog = 'inoscula'
+  const Q = PROGS[prog]
+  for (const b of $('progs').children) { const on = b.dataset.p === prog; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); b.hidden = mode === 'nodes' && PROGS[b.dataset.p].codeOnly }
+  $('viewCode').classList.toggle('on', mode === 'code'); $('viewNodes').classList.toggle('on', mode === 'nodes')
+  $('editorBox').hidden = !(mode === 'code' && prog === 'inoscula')
+  $('dump').hidden = !(mode === 'code' && prog !== 'inoscula')
+  $('nodesBox').hidden = mode !== 'nodes'
+  $('progBar').hidden = prog === 'inoscula'
+  if (part() === 'outline' && !ir?.outline) partOf[prog] = PARTS[prog][0][0]
+  partBar()
+  $('kitBar').hidden = !(prog === 'inoscula' && mode === 'code')
   if (!ir) return
-  const [, , make, how] = tabsSpec[i]
-  // export the current slider values as the defaults
-  const g2 = { ...graph, params: (graph.params ?? []).map((p) => ({ ...p, default: values[p.id] ?? p.default })) }
-  const saveIr = ir, saveGraph = graph
-  ir = check(g2); graph = g2
-  try { current = make() } finally { ir = saveIr; graph = saveGraph }
-  $('dump').textContent = current
-  $('how').textContent = how
+  if (prog !== 'inoscula') {
+    // export the current slider values as the defaults
+    const g2 = { ...graph, params: (graph.params ?? []).map((p) => ({ ...p, default: values[p.id] ?? p.default })) }
+    const saveIr = ir, saveGraph = graph
+    ir = check(g2); graph = g2
+    try { current = Q.make() } catch (e) { current = String(e.message ?? e) } finally { ir = saveIr; graph = saveGraph }
+    $('how').textContent = Q.how()
+    if (mode === 'code') $('dump').innerHTML = hlPlain(current)
+  }
+  if (mode === 'nodes') drawNodes()
   renderNotes()
 }
 function renderNotes() {
   if (!ir) return
-  const tgt = tabsSpec[tab][4]
-  const notes = compat(ir, tgt, { substrate: $('ueSub').checked })
-  const prof = tabsSpec[tab][0] === 'Graph' ? '' : `<div class="close">Preview: ${esc(PROFILES[profileKey].note)}</div>`
-  $('notes').innerHTML = `<div class="sect" style="border:0;padding:0">How it travels to ${esc(tabsSpec[tab][0])}</div>` + notes.map((n) => `<div class="${n.level}">${esc(n.text)}</div>`).join('') + prof
+  const tgt = PROGS[prog].tgt
+  const notes = prog === 'inoscula' || prog === 'graph' ? [] : compat(ir, tgt, { substrate: ueSub })
+  const prof = `<div class="close">Preview: ${esc(PROFILES[profileKey].note)}</div>`
+  $('notes').innerHTML = (notes.length ? `<div class="sect" style="border:0;padding:0">How it travels to ${esc(PROGS[prog].label)}</div>` : '') + notes.map((n) => `<div class="${n.level}">${esc(n.text)}</div>`).join('') + prof
+}
+
+// ------------------------------------------------------------- node view
+// A graph is { nodes: [{ id, title, cat, ins: [{ n, t, v?, hide? }], outs: [{ n, t }], line?, note? }], links: [{ a, ao, b, bi }] }
+// drawn in the look of the program it belongs to. Zoom with the wheel or the buttons, drag the background to pan.
+const THEMES = {
+  inoscula: { bg: '#010400', grid: '#0b1d05', body: '#071a02', stroke: '#1a4a08', text: '#b9c7b3', title: '#3bff03', radius: 0, wire: { float: '#2a9c0a', vec3: '#5c74ff', color: '#ffd23f', shader: '#3bff03' }, sock: { float: '#2a9c0a', vec3: '#5c74ff', color: '#ffd23f', shader: '#3bff03' }, cats: {}, field: '#000000', socketShape: 'square' },
+  blender: { bg: '#1d1d1d', grid: '#262626', body: '#303030', stroke: '#161616', text: '#e5e5e5', title: '#ffffff', radius: 5, field: '#545454', socketShape: 'circle',
+    wire: { float: '#a1a1a1', vec3: '#6363c7', color: '#c7c729', shader: '#63c763' }, sock: { float: '#a1a1a1', vec3: '#6363c7', color: '#c7c729', shader: '#63c763' },
+    cats: { input: '#83314a', output: '#4d0017', shader: '#2b652b', texture: '#e66100', color: '#6c696f', vector: '#3c3c83', converter: '#246283', group: '#3b5959', layout: '#6c696f' } },
+  godot: { bg: '#202531', grid: '#262c3b', body: '#2a3142', stroke: '#1a1e29', text: '#d6dae4', title: '#ffffff', radius: 4, field: '#1c212c', socketShape: 'circle',
+    wire: { float: '#61daf4', vec3: '#d67dee', color: '#d67dee', shader: '#f6a86e' }, sock: { float: '#61daf4', vec3: '#d67dee', color: '#d67dee', shader: '#f6a86e' },
+    cats: { input: '#4b5874', output: '#6b4a4a', texture: '#4f6a52', converter: '#3d4659', vector: '#3d4659', color: '#59475f', shader: '#6b4a4a', group: '#4b5874' } },
+  unreal: { bg: '#262626', grid: '#2e2e2e', body: '#151515', stroke: '#050505', text: '#d0d0d0', title: '#ffffff', radius: 3, field: '#0e0e0e', socketShape: 'circle',
+    wire: { float: '#9fd8a0', vec3: '#e8d16e', color: '#e8d16e', shader: '#ffffff' }, sock: { float: '#9fd8a0', vec3: '#e8d16e', color: '#e8d16e', shader: '#ffffff' },
+    cats: { input: '#3d6b3a', output: '#5b5b5b', texture: '#2f4f75', converter: '#4b4b4b', vector: '#4b4b4b', color: '#4b4b4b', shader: '#5b5b5b', group: '#2f6a73', param: '#3d6b3a', custom: '#6d3d6b' } },
+  unity: { bg: '#202020', grid: '#262626', body: '#393939', stroke: '#191919', text: '#c4c4c4', title: '#e4e4e4', radius: 6, field: '#2a2a2a', socketShape: 'circle',
+    wire: { float: '#84e4e7', vec3: '#f6ff9a', color: '#f6ff9a', shader: '#ffffff' }, sock: { float: '#84e4e7', vec3: '#f6ff9a', color: '#f6ff9a', shader: '#ffffff' },
+    cats: { input: '#2e2e2e', output: '#2e2e2e', texture: '#2e2e2e', converter: '#2e2e2e', vector: '#2e2e2e', color: '#2e2e2e', shader: '#2e2e2e', group: '#2e2e2e', param: '#2e2e2e', custom: '#2e2e2e' } },
+}
+const measure = (() => { const c = document.createElement('canvas').getContext('2d'); return (t, bold) => { c.font = `${bold ? 'bold 12.5px' : '11.5px'} 'Courier Prime', 'Courier New', monospace`; return c.measureText(t).width } })()
+const fmtV = (v) => Array.isArray(v) ? v.map((x) => +(+x).toFixed(2)).join(', ') : typeof v === 'number' ? String(+v.toFixed(3)) : String(v)
+// lay a graph out in columns: each node one column right of the furthest node feeding it
+function layoutGraph(G) {
+  const byId = new Map(G.nodes.map((n) => [n.id, n]))
+  const feeds = new Map(G.nodes.map((n) => [n.id, []]))
+  for (const l of G.links) if (byId.has(l.a) && byId.has(l.b)) feeds.get(l.b).push(l.a)
+  const col = new Map()
+  const colOf = (id, seen = new Set()) => {
+    if (col.has(id)) return col.get(id)
+    if (seen.has(id)) return 0
+    seen.add(id)
+    const n = byId.get(id)
+    const c = n.col ?? Math.max(-1, ...feeds.get(id).map((f) => colOf(f, seen))) + 1
+    col.set(id, c); return c
+  }
+  G.nodes.forEach((n) => colOf(n.id))
+  // outputs go in the last column
+  const last = Math.max(0, ...col.values())
+  for (const n of G.nodes) if (n.sink) col.set(n.id, last + (n.sink === true ? 0 : n.sink) + (G.nodes.some((m) => !m.sink && col.get(m.id) === last) ? 1 : 0))
+  const ROW = 20, HEAD = 24
+  for (const n of G.nodes) {
+    const insW = Math.max(0, ...n.ins.filter((i) => !i.hide).map((i) => measure(i.n) + (i.v !== undefined && !i.link ? measure(fmtV(i.v)) + 16 : 0)))
+    const outsW = Math.max(0, ...n.outs.map((o) => measure(o.n)))
+    n.w = Math.ceil(Math.max(120, measure(n.title, true) + 26, insW + 34, outsW + 34, n.extra ? 150 : 0, n.note ? Math.min(240, measure(n.note) + 20) : 0))
+    n.h = HEAD + (n.outs.length + n.ins.filter((i) => !i.hide).length) * ROW + (n.extra ? 22 : 0) + (n.note ? 18 : 0) + 8
+  }
+  const cols = []
+  for (const n of G.nodes) (cols[col.get(n.id)] ??= []).push(n)
+  // order each column by the average height of what feeds it, so wires cross less
+  let x = 0
+  const cy = new Map()
+  cols.forEach((c) => {
+    if (!c) return
+    c.forEach((n) => { const f = feeds.get(n.id).map((id) => cy.get(id)).filter((v) => v !== undefined); n._k = f.length ? f.reduce((a, b) => a + b, 0) / f.length : 0 })
+    c.sort((a, b) => a._k - b._k)
+    const w = Math.max(...c.map((n) => n.w))
+    let y = 0
+    for (const n of c) { n.x = x; n.y = y; cy.set(n.id, y + n.h / 2); y += n.h + 18 }
+    x += w + 70
+  })
+  return { ROW, HEAD }
+}
+let GV = { k: 1, x: 20, y: 20 }, lastGraph = null, lastGraphKey = ''
+function graphKey() { return prog + blenderLevel + '|' + (ir?.name ?? '') + '|' + (ir?.steps.length ?? 0) }
+function drawGraph(G, theme) {
+  const T = THEMES[theme]
+  const { ROW, HEAD } = layoutGraph(G)
+  const byId = new Map(G.nodes.map((n) => [n.id, n]))
+  const sockY = (n, kind, i) => {
+    const vis = n.ins.filter((x) => !x.hide)
+    return n.y + HEAD + (kind === 'out' ? i : n.outs.length + vis.indexOf(n.ins[i])) * ROW + ROW / 2 + 2
+  }
+  const out = []
+  for (const l of G.links) {
+    const A = byId.get(l.a), B = byId.get(l.b)
+    if (!A || !B || B.ins[l.bi]?.hide) continue
+    const x1 = A.x + A.w, y1 = sockY(A, 'out', l.ao), x2 = B.x, y2 = sockY(B, 'in', l.bi)
+    const t = A.outs[l.ao]?.t ?? 'float', dx = Math.max(40, Math.abs(x2 - x1) * 0.45)
+    out.push(`<path d="M${x1} ${y1} C${x1 + dx} ${y1} ${x2 - dx} ${y2} ${x2} ${y2}" fill="none" stroke="${T.wire[t] ?? T.wire.float}" stroke-width="1.8" opacity="0.85"/>`)
+  }
+  const sock = (x, y, t) => T.socketShape === 'square' ? `<rect x="${x - 4}" y="${y - 4}" width="8" height="8" fill="${T.sock[t] ?? T.sock.float}"/>` : `<circle cx="${x}" cy="${y}" r="4.6" fill="${T.sock[t] ?? T.sock.float}" stroke="#000" stroke-width="1"/>`
+  for (const n of G.nodes) {
+    const head = T.cats[n.cat] ?? (theme === 'inoscula' ? (n.cat === 'output' ? '#3a2e00' : n.cat === 'input' ? '#06303a' : '#0d2a05') : '#444')
+    const r = T.radius
+    let g = `<g class="n" data-id="${esc(n.id)}"${n.line ? ` data-line="${n.line}"` : ''}>`
+    g += `<rect class="body" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${r}" fill="${T.body}" stroke="${T.stroke}" stroke-width="1.5"/>`
+    g += `<path d="M${n.x} ${n.y + HEAD} V${n.y + r} Q${n.x} ${n.y} ${n.x + r} ${n.y} H${n.x + n.w - r} Q${n.x + n.w} ${n.y} ${n.x + n.w} ${n.y + r} V${n.y + HEAD} Z" fill="${head}"/>`
+    if (theme === 'unity') g += `<rect x="${n.x}" y="${n.y + HEAD - 1}" width="${n.w}" height="1" fill="#1a1a1a"/>`
+    g += `<text class="nt" x="${n.x + 9}" y="${n.y + 16}" fill="${theme === 'inoscula' ? T.title : '#fff'}">${esc(n.title)}</text>`
+    let y = n.y + HEAD
+    n.outs.forEach((o) => {
+      g += `<text x="${n.x + n.w - 12}" y="${y + 14}" text-anchor="end" fill="${T.text}">${esc(o.n)}</text>` + sock(n.x + n.w, y + ROW / 2 + 2, o.t)
+      y += ROW
+    })
+    if (n.extra === 'ramp' && n.stops) {
+      const id = 'gr' + Math.random().toString(36).slice(2, 8)
+      g += `<defs><linearGradient id="${id}">${n.stops.map(([p, c]) => `<stop offset="${p}" stop-color="${hex(c)}"/>`).join('')}</linearGradient></defs><rect x="${n.x + 8}" y="${y + 3}" width="${n.w - 16}" height="14" fill="url(#${id})" stroke="#000"/>`
+      y += 22
+    }
+    for (const i of n.ins) {
+      if (i.hide) continue
+      const linked = G.links.some((l) => l.b === n.id && n.ins[l.bi] === i)
+      if (i.v !== undefined && !linked) {
+        g += `<rect x="${n.x + 8}" y="${y + 3}" width="${n.w - 16}" height="${ROW - 5}" rx="${Math.min(3, r)}" fill="${T.field}"/>`
+        g += `<text x="${n.x + 14}" y="${y + 14}" fill="${T.text}">${esc(i.n)}</text><text x="${n.x + n.w - 14}" y="${y + 14}" text-anchor="end" fill="${theme === 'inoscula' ? '#f820a0' : '#ffffff'}">${esc(fmtV(i.v))}</text>`
+      } else g += `<text x="${n.x + 12}" y="${y + 14}" fill="${T.text}">${esc(i.n)}</text>`
+      if (!i.nosock) g += sock(n.x, y + ROW / 2 + 2, i.t)
+      y += ROW
+    }
+    if (n.note) g += `<text x="${n.x + 9}" y="${y + 13}" fill="${T.text}" opacity="0.7" font-size="10.5">${esc(n.note.length > 38 ? n.note.slice(0, 37) + '…' : n.note)}</text>`
+    g += '</g>'
+    out.push(g)
+  }
+  const svg = $('graphSvg')
+  svg.style.background = T.bg
+  svg.style.backgroundImage = `linear-gradient(${T.grid} 1px, transparent 1px), linear-gradient(90deg, ${T.grid} 1px, transparent 1px)`
+  $('graphCam').innerHTML = out.join('')
+  lastGraph = G
+  const key = graphKey()
+  if (key !== lastGraphKey) { lastGraphKey = key; fitGraph() } else applyCam()
+  for (const g of $('graphCam').querySelectorAll('g.n')) {
+    g.addEventListener('click', (e) => { e.stopPropagation(); for (const x of $('graphCam').querySelectorAll('g.sel')) x.classList.remove('sel'); g.classList.add('sel') })
+    g.addEventListener('dblclick', () => { const n = +g.dataset.line; if (n) { prog = 'inoscula'; mode = 'code'; refresh(); goToLine(n) } })
+  }
+}
+function applyCam() {
+  $('graphCam').setAttribute('transform', `translate(${GV.x} ${GV.y}) scale(${GV.k})`)
+  const s = 24 * GV.k
+  $('graphSvg').style.backgroundSize = `${s}px ${s}px`; $('graphSvg').style.backgroundPosition = `${GV.x}px ${GV.y}px`
+}
+function fitGraph() {
+  if (!lastGraph) return
+  const box = $('nodesBox'), W = box.clientWidth || 800, H = box.clientHeight || 500
+  const maxX = Math.max(...lastGraph.nodes.map((n) => n.x + n.w)), maxY = Math.max(...lastGraph.nodes.map((n) => n.y + n.h))
+  const whole = Math.min(1.1, (W - 40) / maxX, (H - 60) / maxY)
+  if (whole >= 0.45 || fitGraph.all) { GV.k = Math.max(0.05, whole); GV.x = (W - maxX * GV.k) / 2; GV.y = Math.max(16, (H - maxY * GV.k) / 2) }
+  else {
+    // too big to read whole: start readable, at the output end, where the shader comes together
+    GV.k = 0.8
+    const out = lastGraph.nodes.find((n) => n.sink) ?? lastGraph.nodes[lastGraph.nodes.length - 1]
+    GV.x = W - 40 - (out.x + out.w) * GV.k; GV.y = H / 2 - (out.y + out.h / 2) * GV.k
+  }
+  fitGraph.all = false
+  applyCam()
+}
+function zoomAt(f, cx, cy) {
+  const k = Math.max(0.1, Math.min(3, GV.k * f)); f = k / GV.k
+  GV.x = cx - (cx - GV.x) * f; GV.y = cy - (cy - GV.y) * f; GV.k = k; applyCam()
+}
+{
+  const box = $('nodesBox'); let p = null
+  box.addEventListener('wheel', (e) => { e.preventDefault(); const r = box.getBoundingClientRect(); zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX - r.left, e.clientY - r.top) }, { passive: false })
+  box.addEventListener('pointerdown', (e) => { if (e.target.closest('g.n, .zoom')) return; p = { x: e.clientX, y: e.clientY, gx: GV.x, gy: GV.y }; box.setPointerCapture(e.pointerId); box.style.cursor = 'grabbing' })
+  box.addEventListener('pointermove', (e) => { if (!p) return; GV.x = p.gx + e.clientX - p.x; GV.y = p.gy + e.clientY - p.y; applyCam() })
+  const end = () => { p = null; box.style.cursor = '' }
+  box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end)
+  const mid = () => [box.clientWidth / 2, box.clientHeight / 2]
+  $('zIn').addEventListener('click', () => zoomAt(1.25, ...mid()))
+  $('zOut').addEventListener('click', () => zoomAt(0.8, ...mid()))
+  $('zFit').addEventListener('click', () => { fitGraph.all = true; fitGraph() })
+}
+let blenderLevel = 'group'
+function graphFor(p) {
+  if (p === 'blender') return blenderLevel === 'material' ? blenderMaterialView(ir) : blenderView(ir)
+  if (p === 'godot' || p === 'unreal' || p === 'unity') return nativeView(ir, p)
+  return inosculaView(ir, lineMap.get(graph))
+}
+$('lvlBtn').addEventListener('click', () => { blenderLevel = blenderLevel === 'group' ? 'material' : 'group'; lastGraphKey = ''; drawNodes() })
+function drawNodes() {
+  if (!ir) return
+  $('lvlBtn').hidden = prog !== 'blender'
+  $('lvlBtn').textContent = blenderLevel === 'group' ? 'Material level' : 'Inside the group'
+  const G = graphFor(prog)
+  $('graphLegend').textContent = G.legend ?? ''
+  drawGraph(G, G.theme ?? prog)
 }
 function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true }, 1800) }
 $('copyBtn').addEventListener('click', () => {
@@ -1004,7 +1332,7 @@ function saveFile(blob, name) {
 }
 if (isTopLevel) {
   $('saveBtn').hidden = false
-  $('saveBtn').addEventListener('click', () => saveFile(new Blob([current], { type: 'text/plain' }), `${fileBase()}.${tabsSpec[tab][1]}`))
+  $('saveBtn').addEventListener('click', () => { const e = PROGS[prog].ext; saveFile(new Blob([current], { type: 'text/plain' }), `${fileBase()}.${typeof e === 'function' ? e() : e}`) })
 }
 function saveSource() {
   if (isTopLevel) saveFile(new Blob([src.value], { type: 'text/plain' }), `${fileBase()}.inoscula`)
@@ -1028,22 +1356,17 @@ function openText(text, name) {
 
 // ------------------------------------------------------------- looks, import
 const lookSel = $('look')
-const groups = {}
-for (const [i, l] of LOOKS.entries()) {
-  const g = groups[l.group] ??= Object.assign(document.createElement('optgroup'), { label: l.group })
-  const o = document.createElement('option'); o.value = i; o.textContent = l.title; g.append(o)
-}
-for (const g of Object.values(groups)) lookSel.append(g)
 function load(i) {
-  const l = LOOKS[i]
+  const l = String(i).startsWith('my') ? myLooks()[+String(i).slice(2)] : LOOKS[i]
+  if (!l) return
   cardsChoice = null
   src.value = l.code; $('fileName').textContent = l.file
-  values = {}; lfo = {}
+  values = {}; lfo = {}; for (const k in bypass) delete bypass[k]
   setShape(l.shape ?? 'Sphere')
   compile()
   src.scrollTop = 0
 }
-lookSel.addEventListener('change', () => load(+lookSel.value))
+lookSel.addEventListener('change', () => load(lookSel.value))
 const sheet = $('sheet')
 $('importBtn').addEventListener('click', () => { sheet.hidden = false; $('pasteBox').focus() })
 $('sheetCancel').addEventListener('click', () => { sheet.hidden = true })
@@ -1051,21 +1374,24 @@ $('fileIn').addEventListener('change', async () => { const f = $('fileIn').files
 $('sheetOk').addEventListener('click', () => { if (openText($('pasteBox').value, 'imported.inoscula')) sheet.hidden = true })
 $('refBtn').addEventListener('click', () => { $('refSheet').hidden = false })
 $('refClose').addEventListener('click', () => { $('refSheet').hidden = true })
-for (const s of [sheet, $('refSheet')]) s.addEventListener('click', (e) => { if (e.target === s) s.hidden = true })
-addEventListener('keydown', (e) => { if (e.key === 'Escape') { sheet.hidden = true; $('refSheet').hidden = true } })
+const sheets = [sheet, $('refSheet'), $('liveSheet'), $('lookSheet')]
+for (const s of sheets) s.addEventListener('click', (e) => { if (e.target === s) s.hidden = true })
+addEventListener('keydown', (e) => { if (e.key === 'Escape') for (const s of sheets) s.hidden = true })
 $('profile').addEventListener('change', () => setProfile($('profile').value))
 $('envSel').addEventListener('change', () => setEnv($('envSel').value))
 
 // ------------------------------------------------------------- Inoscula Live
 let ws = null
-function liveState(text, cls) { $('livePill').textContent = text; $('livePill').className = 'pill ' + (cls ?? '') }
-$('liveBtn').addEventListener('click', () => {
-  if (ws) { ws.close(); ws = null; liveState('Offline'); $('liveBtn').setAttribute('aria-pressed', 'false'); return }
-  try { ws = new WebSocket('ws://localhost:9420') } catch { liveState('Blocked here', 'warn'); return }
-  liveState('Connecting', 'warn'); $('liveBtn').setAttribute('aria-pressed', 'true')
-  ws.onopen = () => liveState('Live', 'on')
-  ws.onclose = () => { if (ws) liveState('Start inoscula-live', 'warn'); ws = null; $('liveBtn').setAttribute('aria-pressed', 'false') }
-  ws.onerror = () => liveState('Start inoscula-live', 'warn')
+function liveState(text, cls) { for (const el of [$('liveState'), $('liveSheetState')]) { el.textContent = text; el.className = el.id === 'liveState' ? 'link-state ' + (cls ?? '') : '' } $('liveConnect').textContent = ws ? 'Disconnect' : 'Connect'; $('liveBtn').classList.toggle('solid', cls === 'on') }
+$('liveBtn').addEventListener('click', () => { $('liveSheet').hidden = false })
+$('liveClose').addEventListener('click', () => { $('liveSheet').hidden = true })
+$('liveConnect').addEventListener('click', () => {
+  if (ws) { const w = ws; ws = null; w.close(); liveState('Not linked'); return }
+  try { ws = new WebSocket('ws://localhost:9420') } catch { liveState('This page cannot reach your computer. Open the Studio file instead.', 'warn'); return }
+  liveState('Connecting…', 'warn')
+  ws.onopen = () => { liveState('Linked', 'on'); setTimeout(() => { $('liveSheet').hidden = true }, 600) }
+  ws.onclose = () => { if (ws) { ws = null; liveState('Bridge not running: start step 1, then Connect', 'warn') } }
+  ws.onerror = () => {}
   ws.onmessage = (e) => {
     try {
       const m = JSON.parse(e.data)
@@ -1080,6 +1406,220 @@ function liveSend(id, v) {
   if (!ws || ws.readyState !== 1 || !ir) return
   ws.send(JSON.stringify({ material: ir.name, param: id, value: v }))
 }
+
+// ------------------------------------------------------------- layout: drag the splits, swap the panels
+{
+  const root = document.documentElement.style
+  const saved = (() => { try { return JSON.parse(store.get('inoscula-layout') ?? '{}') } catch { return {} } })()
+  const keep = () => store.set('inoscula-layout', JSON.stringify(saved))
+  const apply = () => {
+    if (saved.split) root.setProperty('--split', saved.split + 'fr')
+    if (saved.stageH) root.setProperty('--stageH', saved.stageH + 'px')
+    if (saved.belowH) root.setProperty('--belowH', saved.belowH + 'px')
+  }
+  apply()
+  const drag = (el, onMove) => {
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); el.setPointerCapture(e.pointerId)
+      const move = (ev) => onMove(ev)
+      const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); keep() }
+      el.addEventListener('pointermove', move); el.addEventListener('pointerup', up)
+    })
+  }
+  const stage = $('stage')
+  drag($('vsplit'), (e) => {
+    const r = stage.getBoundingClientRect(), f = Math.max(0.2, Math.min(0.8, (e.clientX - r.left) / r.width))
+    saved.split = +(f / (1 - f)).toFixed(3); apply()
+  })
+  drag($('hsplitStage'), (e) => { saved.stageH = Math.round(Math.max(320, e.clientY - stage.getBoundingClientRect().top)); apply() })
+  drag($('hsplitBelow'), (e) => { saved.belowH = Math.round(Math.max(260, e.clientY - $('belowSlot').getBoundingClientRect().top)); apply() })
+  const keys = (el, prop, step, min) => el.addEventListener('keydown', (e) => {
+    const d = { ArrowUp: -step, ArrowLeft: -step, ArrowDown: step, ArrowRight: step }[e.key]; if (!d) return
+    e.preventDefault()
+    if (prop === 'split') { saved.split = Math.max(0.25, Math.min(4, (saved.split ?? 1.25) * (d > 0 ? 1.1 : 1 / 1.1))) }
+    else saved[prop] = Math.max(min, (saved[prop] ?? (prop === 'stageH' ? stage.clientHeight : $('belowSlot').clientHeight)) + d)
+    apply(); keep()
+  })
+  keys($('vsplit'), 'split', 1, 0); keys($('hsplitStage'), 'stageH', 40, 320); keys($('hsplitBelow'), 'belowH', 40, 260)
+  const swap = () => {
+    const a = $('sideSlot').firstElementChild, b = $('belowSlot').firstElementChild
+    $('sideSlot').append(b); $('belowSlot').append(a)
+    saved.swapped = $('sideSlot').firstElementChild.id === 'shaderFrame'; keep()
+    if (mode === 'nodes') requestAnimationFrame(fitGraph)
+  }
+  for (const b of document.querySelectorAll('.swap')) b.addEventListener('click', swap)
+  if (saved.swapped) swap()
+  new ResizeObserver(() => { if (mode === 'nodes' && lastGraph) applyCam() }).observe($('nodesBox'))
+}
+
+// ------------------------------------------------------------- your own looks
+const MY = 'inoscula-mylooks'
+const myLooks = () => { try { return JSON.parse(store.get(MY) ?? '[]') } catch { return [] } }
+function fillLooks() {
+  lookSel.innerHTML = ''
+  const groups = {}
+  for (const [i, l] of LOOKS.entries()) {
+    const g = groups[l.group] ??= Object.assign(document.createElement('optgroup'), { label: l.group })
+    const o = document.createElement('option'); o.value = i; o.textContent = l.title; g.append(o)
+  }
+  const mine = myLooks()
+  if (mine.length) {
+    const g = groups['My looks'] = Object.assign(document.createElement('optgroup'), { label: 'My looks' })
+    for (const [i, l] of mine.entries()) { const o = document.createElement('option'); o.value = 'my' + i; o.textContent = l.title; g.append(o) }
+  }
+  for (const g of Object.values(groups)) lookSel.append(g)
+}
+function bakeValues(code) {
+  // write the current parameter values into the code as the new defaults
+  const num = (x) => { const s = String(+(+x).toFixed(4)); return s.includes('.') || s.includes('e') ? s : s + '.0' }
+  return code.replace(/^([ \t]*uniform\s+(float|vec3)\s+(\w+)\s*=\s*)([^;]+)(;)/gm, (m, a, ty, id, old, end) => {
+    const v = values[id]; if (v === undefined) return m
+    return a + (ty === 'float' ? num(v) : `vec3(${v.map(num).join(', ')})`) + end
+  })
+}
+$('saveLookBtn').addEventListener('click', () => {
+  const cur = String(lookSel.value)
+  const mine = myLooks(), idx = cur.startsWith('my') ? +cur.slice(2) : -1
+  $('lookName').value = idx >= 0 ? mine[idx].title : (ir?.name ? ir.name + ' (mine)' : 'My look')
+  $('lookDelete').hidden = idx < 0; $('lookMsg').textContent = ''
+  $('lookSheet').hidden = false; $('lookName').focus(); $('lookName').select()
+})
+$('lookCancel').addEventListener('click', () => { $('lookSheet').hidden = true })
+$('lookOk').addEventListener('click', () => {
+  const title = $('lookName').value.trim().slice(0, 40)
+  if (!title) { $('lookMsg').textContent = 'Give it a name.'; return }
+  const code = bakeValues(src.value).replace(/^name\s+"[^"]*";/m, `name ${JSON.stringify(title)};`)
+  const mine = myLooks().filter((l) => l.title !== title)
+  mine.push({ title, code, shape: shapeName === 'Model' ? 'Sphere' : shapeName, file: title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.inoscula', group: 'My looks' })
+  store.set(MY, JSON.stringify(mine))
+  fillLooks(); fillGuestLooks(); lookSel.value = 'my' + (mine.length - 1)
+  src.value = code; $('fileName').textContent = mine[mine.length - 1].file; compile()
+  $('lookSheet').hidden = true; toast('Saved to My looks')
+})
+$('lookDelete').addEventListener('click', () => {
+  const cur = String(lookSel.value); if (!cur.startsWith('my')) return
+  const mine = myLooks(); mine.splice(+cur.slice(2), 1); store.set(MY, JSON.stringify(mine))
+  fillLooks(); lookSel.value = '0'; load(0); $('lookSheet').hidden = true; toast('Deleted')
+})
+$('lookName').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('lookOk').click() })
+
+// Kitbash: mix another look into this one. The other look's parameters and functions get a prefix so nothing
+// clashes, its main() becomes a function that returns its colour, and a mask decides where it shows.
+const KIT_MASKS = {
+  everywhere: '1.0',
+  patches: 'smoothstep(0.45, 0.55, noise(object_pos, 2.5, 2.0, 0.5, 2.0))',
+  light: 'smoothstep(0.0, 0.6, dot(normal, light_dir))',
+  shadow: 'smoothstep(0.0, 0.6, -dot(normal, light_dir))',
+  top: 'smoothstep(-0.2, 0.4, normal.z)',
+  edges: 'smoothstep(0.55, 0.85, 1.0 - abs(dot(normal, view_dir)))',
+  crevices: 'smoothstep(0.9, 0.5, occlusion)',
+}
+function kitbash(codeA, codeB, maskKey, tag) {
+  const p = tag + '_'
+  // drop the other look's own header lines
+  let b = codeB.replace(/^\s*(name|shading|surface|cards|shells)\b[^;]*;[^\n]*\n/gm, '').replace(/^\s*\/\/[^\n]*\n/gm, '')
+  // its names: parameters and functions
+  const uni = [...b.matchAll(/^\s*uniform\s+(?:float|vec3)\s+(\w+)/gm)].map((m) => m[1])
+  const fns = [...b.matchAll(/^\s*(?:float|vec3)\s+(\w+)\s*\(/gm)].map((m) => m[1])
+  for (const n of [...uni, ...fns]) b = b.replace(new RegExp(`\\b${n}\\b`, 'g'), p + n)
+  // labels say where they came from
+  b = b.replace(/@label\s+([^\n@]+)/g, (m, l) => `@label ${tag} ${l.trim()}`)
+  // main() becomes a function returning its colour; its other outputs are kept as local values
+  const mi = b.search(/\bvoid\s+main\s*\(\s*\)\s*\{/)
+  if (mi < 0) throw new Error('That look has no main()')
+  const open = b.indexOf('{', mi), close = b.lastIndexOf('}')
+  let body = b.slice(open + 1, close)
+  const outs = ['color', 'alpha', 'roughness', 'metallic', 'bump', 'emission', 'coat', 'coat_roughness', 'sheen', 'sheen_color', 'sheen_roughness', 'subsurface', 'outline', 'outline_color', 'outline_breakup', 'outline_rings']
+  const vecOut = new Set(['color', 'emission', 'sheen_color', 'outline_color'])
+  const used = outs.filter((o) => new RegExp(`(^|[;{}\\s])${o}\\s*=(?!=)`, 'm').test(body))
+  for (const o of used) body = body.replace(new RegExp(`(^|[;{}\\s])${o}\\s*=(?!=)`, 'gm'), `$1${p}o_${o} =`)
+  const decl = used.map((o) => `  ${vecOut.has(o) ? 'vec3' : 'float'} ${p}o_${o} = ${vecOut.has(o) ? 'vec3(0.0)' : '0.0'};`).join('\n')
+  const fn = `\n// ${tag}: mixed in\nvec3 ${p}look(float unused) {\n${decl}\n${body.replace(/^\n/, '')}\n  return ${p}o_color;\n}\n`
+  b = b.slice(0, mi) + fn
+  // the mix itself: a strength and the mask
+  const ctrl = `uniform float ${p}mix = 1.0; // @range 0 1 @label ${tag} Amount\n`
+  // put the other look's parameters and functions before this look's main(), then mix at the end of main()
+  const am = codeA.search(/\bvoid\s+main\s*\(\s*\)\s*\{/)
+  const head = codeA.slice(0, am), rest = codeA.slice(am)
+  const end = rest.lastIndexOf('}')
+  const mixLine = `\n  // ${tag}: where it shows\n  color = mix(color, ${p}look(0.0), ${p}mix * ${KIT_MASKS[maskKey] ?? '1.0'});\n`
+  return head + ctrl + b.trim() + '\n\n' + rest.slice(0, end).replace(/\s*$/, '') + mixLine + rest.slice(end)
+}
+let kitN = 0
+$('kitBtn').addEventListener('click', () => {
+  const v = $('kitLook').value
+  const l = String(v).startsWith('my') ? myLooks()[+String(v).slice(2)] : LOOKS[+v]
+  const used = new Set([...src.value.matchAll(/\b(K\d+)_mix\b/g)].map((m) => m[1]))
+  let tag; do tag = 'K' + ++kitN; while (used.has(tag))
+  try {
+    const out = kitbash(src.value, l.code, $('kitMask').value, tag)
+    parse(out)
+    src.value = out; store.set('inoscula-draft', src.value); compile()
+    toast(`${l.title} mixed in. Its sliders start with ${tag}.`)
+  } catch (e) { toast(String(e.message ?? e).slice(0, 90)) }
+})
+
+// ------------------------------------------------------------- other objects in the scene, each with its own look
+// The object you edit stays in the middle; others stand around it with their own shaders, so you can see how
+// looks sit together, in front of and behind each other, under the same light.
+const guests = []
+const SLOTS = [[2.5, 0.2], [-2.5, 0.2], [0.9, -2.4], [-1.2, 2.0], [-0.9, -2.6], [2.6, -2.2]]
+function lookMaterial(code) {
+  const ir2 = check(parse(code)), sh = toThree(ir2)
+  const u = {}
+  for (const [k, v] of Object.entries(sh.uniforms)) u[k] = { value: Array.isArray(v) ? new THREE.Vector3(...v) : v }
+  for (const p of ir2.params) { const x = u['p_' + p.id]; if (x) { if (Array.isArray(p.default)) x.value.set(...p.default); else x.value = p.default } }
+  let m
+  if (sh.lit) {
+    m = new THREE.MeshPhysicalMaterial({ transparent: Boolean(ir2.alpha) && !ir2.cutout, vertexColors: sh.vertexColors })
+    if (ir2.cutout) { m.alphaTest = 0.5; m.side = THREE.DoubleSide }
+    m.defines = { USE_UV: '' }
+    if (ir2.layers.coat) m.clearcoat = 1
+    if (ir2.layers.sheen) m.sheen = 1
+    m.onBeforeCompile = (sx) => { Object.assign(sx.uniforms, u); const pt = sh.litPatch(sx.vertexShader, sx.fragmentShader); sx.vertexShader = pt.vertexShader; sx.fragmentShader = pt.fragmentShader }
+    const key = sh.fragmentShader + sh.vertexColors; m.customProgramCacheKey = () => key
+  } else m = new THREE.ShaderMaterial({ vertexShader: sh.vertexShader, fragmentShader: sh.fragmentShader, uniforms: u, transparent: Boolean(ir2.alpha) && !ir2.cutout, side: ir2.cutout ? THREE.DoubleSide : THREE.FrontSide, vertexColors: sh.vertexColors })
+  return { m, u, ir: ir2 }
+}
+function fillGuestLooks() {
+  for (const sel of [$('guestLook'), $('kitLook')]) {
+  sel.innerHTML = ''
+  for (const [i, l] of LOOKS.entries()) { const o = document.createElement('option'); o.value = i; o.textContent = l.title; sel.append(o) }
+  for (const [i, l] of myLooks().entries()) { const o = document.createElement('option'); o.value = 'my' + i; o.textContent = l.title + ' (mine)'; sel.append(o) }
+  }
+}
+async function addGuest(shapeN, lookIdx) {
+  if (guests.length >= SLOTS.length) { toast('That is plenty of objects'); return }
+  const l = String(lookIdx).startsWith('my') ? myLooks()[+String(lookIdx).slice(2)] : LOOKS[+lookIdx]
+  let built
+  try { built = lookMaterial(l.code) } catch (e) { toast('That look does not build'); return }
+  const obj = SHAPES[shapeN]()
+  const meshes = []
+  obj.traverse((o) => { if (o.isMesh) { o.material = built.m; o.castShadow = o.receiveShadow = true; meshes.push(o) } })
+  obj.scale.multiplyScalar(0.7)
+  const slot = SLOTS[guests.length]
+  const g = new THREE.Group(); g.add(obj); scene.add(g)
+  const box = new THREE.Box3().setFromObject(g)
+  g.position.set(slot[0], ground.position.y - box.min.y + 0.001, slot[1])
+  const size = box.getSize(new THREE.Vector3()).length() || 2
+  for (const m of meshes) m.onBeforeRender = () => { if (built.u.inoscula_object_size) { built.u.inoscula_object_size.value = size; built.m.uniformsNeedUpdate = true } }
+  const guest = { g, built, title: l.title }
+  guests.push(guest)
+  if (guests.length === 1) cam.position.multiplyScalar(1.45)
+  drawGuests()
+  busy(true, 'Compiling shader…')
+  try { await renderer.compileAsync(scene, cam) } catch {}
+  busy(false)
+}
+function drawGuests() {
+  const box = $('guests'); box.innerHTML = ''
+  for (const [i, gu] of guests.entries()) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = gu.title + ' \u00d7'; b.title = 'Remove ' + gu.title
+    b.addEventListener('click', () => { scene.remove(gu.g); gu.built.m.dispose(); guests.splice(i, 1); if (!guests.length) cam.position.multiplyScalar(1 / 1.45); drawGuests() })
+    box.append(b)
+  }
+}
+$('guestAdd').addEventListener('click', () => addGuest($('guestShape').value, $('guestLook').value))
 
 // ------------------------------------------------------------- run
 let playing = true, t = 0, last = performance.now()
@@ -1107,6 +1647,12 @@ function frame(now) {
     if (now - lastSend > 50) liveSend(id, v)
   }
   if (now - lastSend > 50) lastSend = now
+  for (const gu of guests) {
+    const u = gu.built.u
+    if (u.inoscula_time) u.inoscula_time.value = t
+    if (u.inoscula_light_dir) u.inoscula_light_dir.value.copy(sun.position).normalize()
+    if (u.inoscula_light_color) u.inoscula_light_color.value.set(sun.color.r, sun.color.g, sun.color.b)
+  }
   if (uniforms) {
     uniforms.inoscula_time.value = t
     uniforms.inoscula_light_dir.value.copy(sun.position).normalize()
@@ -1116,7 +1662,12 @@ function frame(now) {
 }
 setEnv('studio'); setProfile('rico')
 const draft = store.get('inoscula-draft')
-load(0)
+// open a look by link: inoscula-studio.html#look=paint-bands
+const startFile = /look=([\w-]+)/.exec(location.hash)?.[1]
+const startIdx = LOOKS.findIndex((l) => l.file === startFile + '.inoscula')
+fillLooks(); fillGuestLooks()
+lookSel.value = String(Math.max(0, startIdx))
+load(Math.max(0, startIdx))
 if (draft && draft !== src.value && /void\s+main/.test(draft)) { src.value = draft; $('fileName').textContent = 'draft.inoscula'; compile() }
 resize()
 requestAnimationFrame(frame)

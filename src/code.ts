@@ -307,3 +307,8 @@ export function body(ir: IR, L: Lang, indent = '  ') {
   out.push(`${indent}float g_out_sss = ${ly?.subsurface ? argStr(L, ly.subsurface) : '0.0'};`)
   return out.join('\n')
 }
+
+/** The helper functions one at a time, for code nodes that each carry only what they call. */
+export function helperParts(L: Lang) {
+  return { base: translate(HELPERS_GLSL, L), hash: translate(HASH_GLSL, L), noise: translate(NOISE_GLSL, L), voronoi: translate(VORONOI_GLSL, L), bump: translate(BUMP_GLSL, L), ramp: (s: Step) => rampFn(L, s) }
+}

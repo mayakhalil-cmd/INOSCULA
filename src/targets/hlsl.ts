@@ -275,7 +275,7 @@ ${ir.outline ? unrealOutline() : ''}`
     const wp = pOf(o.width), cp = pOf(o.color)
     const wv = wp ? (wp.default as number) : (o.width.v as number), cv = (cp ? cp.default : o.color.v) as number[]
     const bp = pOf(o.breakup), bv = bp ? (bp.default as number) : (o.breakup.v as number)
-    const maskCode = `struct InosculaOutline {\n${noiseHelpers(LANG.hlsl)}\n};\nInosculaOutline G;\nif (Sign >= 0.0) return 0.0;\nif (Breakup > 0.0 && G.inoscula_noise(float3(P.x, -P.y, P.z) * 0.01, 30.0, 2.0, 0.5, 2.0) < Breakup) return 0.0;\n${o.rings ? `if (frac(abs(dot(normalize(N), normalize(C))) * ${o.rings}.0 * 1.6 + G.inoscula_noise(float3(P.x, -P.y, P.z) * 0.01, 3.0, 1.0, 0.5, 2.0) * 0.7) > 0.3) return 0.0;\n` : ''}return 1.0;`
+    const maskCode = `struct InosculaOutline {\n${noiseHelpers(LANG.hlsl)}\n};\nInosculaOutline G;\nif (Sign >= 0.0) return 0.0;\nif (Breakup > 0.0 && G.inoscula_noise(float3(P.x, -P.y, P.z) * 0.01, 30.0, 2.0, 0.5, 2.0) < Breakup) return 0.0;\n${o.rings ? `if (abs(dot(normalize(N), normalize(C))) > 0.55) return 0.0;\nif (frac(abs(dot(normalize(N), normalize(C))) * ${o.rings}.0 * 1.6 + G.inoscula_noise(float3(P.x, -P.y, P.z) * 0.01, 3.0, 1.0, 0.5, 2.0) * 0.7) > 0.3) return 0.0;\n` : ''}return 1.0;`
     return `
 # ---- outline: an Overlay Material (Static Mesh component > Overlay Material)
 opath = FOLDER + "/" + NAME + "_Outline"
@@ -389,6 +389,7 @@ ${noiseHelpers(LANG.hlsl).replace(/\binoscula_/g, 'InosculaOutline_')}
         // a broken, hand-inked line: the same noise as every tool (object space, Y up to Z up)
         clip(_Breakup > 0.0 ? InosculaOutline_noise(i.obj.xzy, 30.0, 2.0, 0.5, 2.0) - _Breakup : 1.0);
 ${o.rings ? `        // loose offset lines: thin rings across the halo, each wobbling on its own
+        clip(0.55 - abs(dot(normalize(i.wn), normalize(GetCameraPositionWS() - i.wp))));
         clip(0.3 - frac(abs(dot(normalize(i.wn), normalize(GetCameraPositionWS() - i.wp))) * ${o.rings}.0 * 1.6 + InosculaOutline_noise(i.obj.xzy, 3.0, 1.0, 0.5, 2.0) * 0.7));
 ` : ''}        return _Color;
       }
