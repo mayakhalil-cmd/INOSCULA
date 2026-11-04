@@ -1,0 +1,41 @@
+// Aged concrete: pits, rain stains, moss, damp line
+name "Aged Concrete";
+shading "lit";
+
+uniform vec3 concrete = vec3(0.52, 0.50, 0.47);  // @color @label Concrete
+uniform vec3 moss = vec3(0.18, 0.24, 0.08);      // @color @label Moss
+uniform float stains = 0.6;                        // @range 0 1 @label Rain Stains
+uniform float mossAmt = 0.4;                       // @range 0 1 @label Moss
+uniform float pits = 0.6;                          // @range 0 1 @label Pits
+uniform float damp = 0.3;                          // @range 0 1 @label Damp Line
+
+void main() {
+  vec3 p = object_pos;
+  float big = noise(p, 1.5, 4.0, 0.55, 2.0);
+  float mid = noise(p, 9.0, 4.0, 0.5, 2.0);
+  float grain = noise(p, 80.0, 2.0, 0.5, 2.0);
+  vec3 base = concrete * (0.82 + 0.3 * big + 0.12 * mid) * (0.94 + 0.12 * grain);
+
+  // Pits and air bubbles
+  float bub = voronoi(p, 22.0, 1.0);
+  float pit = (1.0 - smoothstep(0.05, 0.12, bub)) * step(0.55, bub.color.x) * pits;
+
+  // Streaks running down
+  float streak = noise(p * vec3(6.0, 6.0, 0.35), 3.0, 4.0, 0.6, 2.0);
+  float stain = smoothstep(0.45, 0.75, streak) * stains;
+  base = base * (1.0 - stain * 0.35);
+
+  // Moss
+  float shelter = (1.0 - occlusion) * 1.2 + smoothstep(0.5, 1.0, normal.z) * 0.4;
+  float m = smoothstep(0.55, 0.8, shelter * mossAmt + noise(p, 6.0, 4.0, 0.6, 2.0) * 0.6 - 0.2);
+  base = mix(base, moss * (0.8 + 0.4 * mid), m);
+
+  // Damp at the bottom
+  float wet = smoothstep(-0.2, -0.8, p.z) * damp;
+  base = base * (1.0 - wet * 0.45);
+
+  color = base * (1.0 - pit * 0.5);
+  roughness = mix(mix(0.88 - mid * 0.1, 0.55, wet), 0.75, m);
+  metallic = 0.0;
+  bump = (mid * 0.002 + grain * 0.0004) - pit * 0.003 + m * 0.001;
+}

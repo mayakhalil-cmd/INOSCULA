@@ -1,0 +1,11 @@
+{
+  "name": "inoscula-shaders",
+  "version": "0.3.0",
+  "description": "Write a realtime shader once and get native, editable versions for Blender, Godot, Unreal, Unity, three.js and RICO Engine.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": { "inoscula": "bin/inoscula.ts" },
+  "exports": { ".": "./src/index.ts", "./rico": "./src/rico.ts", "./lang": "./src/lang.ts" },
+  "engines": { "node": ">=22.18" },
+  "scripts": { "build-examples": "node bin/inoscula.ts examples/*.inoscula.json --out out", "test": "node test/run.mjs" }
+}

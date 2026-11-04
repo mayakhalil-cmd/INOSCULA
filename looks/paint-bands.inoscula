@@ -1,0 +1,53 @@
+// Paint bands: light in flat painted bands
+name "Paint Bands";
+
+uniform vec3 sunCol = vec3(1.0, 0.82, 0.58);      // @color @label Sun Colour
+uniform vec3 skyCol = vec3(0.35, 0.55, 0.95);     // @color @label Sky Colour
+uniform vec3 base = vec3(0.82, 0.22, 0.30);       // @color @label Base Colour
+uniform vec3 shadowCol = vec3(0.16, 0.07, 0.25);  // @color @label Shadow Colour
+uniform vec3 rimCol = vec3(0.4, 1.0, 0.85);       // @color @label Rim Colour
+uniform float bands = 3.0;                         // @range 1 6 @label Light Bands
+uniform float brush = 0.45;                        // @range 0 1 @label Brushy Edges
+uniform float painted = 0.35;                      // @range 0 1 @label Painted Normals
+uniform float line = 0.25;                         // @range 0 0.6 @label Outline
+uniform float fps = 12.0;                          // @range 1 24 @label Frames Per Second
+
+// Patches of paint
+float strokes(vec3 p, float size, vec3 shift) {
+  float patch = voronoi(p + shift, size * 0.35, 1.0);
+  vec3 axis = normalize(patch.color - vec3(0.5));
+  float along = dot(p, axis);
+  vec3 across = p - axis * along;
+  float bristle = noise(across * size * 3.0 + axis * along * size * 0.25 + shift, 1.0, 3.0, 0.6, 2.0);
+  return mix(0.5, smoothstep(0.25, 0.75, bristle), smoothstep(0.0, 0.25, patch));
+}
+
+void main() {
+  float frame = floor(time * fps);
+  vec3 jit = vec3(hash(vec3(frame, 3.0, 5.0)), hash(vec3(frame, 4.0, 5.0)), hash(vec3(frame, 5.0, 5.0)));
+  vec3 p = object_pos;
+
+  // Painted normals
+  vec3 wob = vec3(noise(p + vec3(1.3), 2.0, 2.0, 0.5, 2.0), noise(p + vec3(5.1), 2.0, 2.0, 0.5, 2.0), noise(p + vec3(9.7), 2.0, 2.0, 0.5, 2.0)) - vec3(0.5);
+  vec3 n = normalize(normal + wob * painted * 2.0);
+
+  // Sun
+  float st = strokes(p, 9.0, jit * 3.0);
+  float sun = saturate(dot(n, light_dir) * 0.5 + 0.5 + (st - 0.5) * brush * 0.5);
+  float stepped = floor(sun * bands) / bands;
+
+  // Sky
+  float sky = saturate(n.z * 0.5 + 0.5);
+
+  vec3 c = mix(shadowCol, base, stepped);
+  c = c * (0.9 + 0.2 * st);
+  c = c + sunCol * smoothstep(0.85, 0.9, sun) * 0.35;
+  c = c + skyCol * sky * 0.18;
+
+  // Rim and outline
+  float facing = max(dot(normal, view_dir), 0.0);
+  float rimMask = smoothstep(0.68, 0.72, 1.0 - facing) * (1.0 - stepped);
+  c = mix(c, rimCol, rimMask * 0.8);
+  float w = line * (0.7 + 0.6 * noise(p * 3.0 + jit * 8.0, 2.0, 1.0, 0.5, 2.0));
+  color = mix(c, vec3(0.03, 0.02, 0.05), smoothstep(1.0 - w, 1.0 - w + 0.03, 1.0 - facing));
+}

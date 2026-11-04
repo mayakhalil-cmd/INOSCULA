@@ -1,0 +1,36 @@
+// Hard reflections: black and white glass and chrome
+name "Hard Reflections";
+
+uniform vec3 dark = vec3(0.01, 0.01, 0.012);       // @color @label Body
+uniform vec3 shine = vec3(1.0, 1.0, 1.0);          // @color @label Reflection
+uniform vec3 lightA = vec3(0.6, -0.4, 0.7);        // @label Fake Light A
+uniform vec3 lightB = vec3(-0.7, -0.2, 0.3);       // @label Fake Light B
+uniform float width = 0.55;                         // @range 0 1 @label Hotspot Size
+uniform float rimWidth = 0.28;                      // @range 0 0.8 @label Rim Width
+uniform float scribble = 0.5;                       // @range 0 1 @label Scribbles
+uniform float spin = 0.0;                           // @range 0 6.283 @label Rotate Lights
+
+// Rotate around vertical
+vec3 turn(vec3 d, float a) {
+  float c = cos(a);
+  float s = sin(a);
+  return vec3(d.x * c - d.y * s, d.x * s + d.y * c, d.z);
+}
+
+void main() {
+  vec3 r = reflect(vec3(0.0) - view_dir, normal);
+  float a = saturate(dot(r, normalize(turn(lightA, spin))) + width - 1.0);
+  float b = saturate(dot(r, normalize(turn(lightB, spin))) + width - 1.0);
+  float spots = saturate(floor((a + b) * 8.0 + 0.5));
+
+  // Hard rim
+  float facing = dot(normal, view_dir);
+  float rim = step(1.0 - rimWidth, 1.0 - facing);
+
+  // Scribbled detail
+  float lines = noise(r * vec3(1.0, 1.0, 8.0), 6.0, 2.0, 0.5, 2.0);
+  float scr = step(0.62, lines) * step(0.35, 1.0 - facing) * scribble;
+
+  float m = max(max(spots, rim), scr);
+  color = mix(dark, shine, m);
+}

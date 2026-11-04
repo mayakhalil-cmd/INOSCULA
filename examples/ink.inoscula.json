@@ -1,0 +1,20 @@
+{
+  "inoscula": "0.1",
+  "name": "Ink Wash",
+  "params": [
+    { "id": "paper", "type": "color", "default": [0.93, 0.89, 0.8], "label": "Paper" },
+    { "id": "ink", "type": "color", "default": [0.08, 0.1, 0.22], "label": "Ink" },
+    { "id": "scale", "type": "float", "default": 3.0, "min": 0.5, "max": 20, "label": "Grain Scale" },
+    { "id": "detail", "type": "float", "default": 4.5, "min": 0, "max": 15, "label": "Detail" }
+  ],
+  "nodes": [
+    { "id": "p", "op": "object_pos" },
+    { "id": "n1", "op": "noise", "in": { "p": "p", "scale": "$scale", "detail": "$detail", "roughness": 0.55, "lacunarity": 2.0 } },
+    { "id": "n2", "op": "noise", "in": { "p": "p", "scale": 18.0, "detail": 1.0, "roughness": 0.5, "lacunarity": 2.0 } },
+    { "id": "w", "op": "mix", "in": { "a": "n1", "b": "n2", "t": 0.2 } },
+    { "id": "bands", "op": "ramp", "in": { "t": "w" }, "set": { "mode": "constant", "stops": [[0.0, [0.0, 0.0, 0.0]], [0.42, [0.45, 0.45, 0.45]], [0.52, [0.8, 0.8, 0.8]], [0.6, [1.0, 1.0, 1.0]]] } },
+    { "id": "s", "op": "separate", "in": { "v": "bands" } },
+    { "id": "col", "op": "mix", "in": { "a": "$ink", "b": "$paper", "t": "s.x" } }
+  ],
+  "output": { "color": "col" }
+}

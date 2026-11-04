@@ -1,0 +1,35 @@
+// Paint with light: light picks the colour
+name "Paint With Light";
+
+uniform vec3 shadowHue = vec3(0.08, 0.1, 0.32);     // @color @label Shadow
+uniform vec3 coolHue = vec3(0.32, 0.18, 0.55);      // @color @label Cool
+uniform vec3 midHue = vec3(0.86, 0.26, 0.42);       // @color @label Middle
+uniform vec3 warmHue = vec3(1.0, 0.56, 0.22);       // @color @label Warm
+uniform vec3 lightHue = vec3(1.0, 0.93, 0.68);      // @color @label Light
+uniform float strokeScale = 3.0;                     // @range 1 20 @label Stroke Scale
+uniform float strokeRotation = 0.6;                  // @range 0 3.1416 @label Stroke Rotation
+uniform float complexity = 3.0;                      // @range 1 6 @label Stroke Complexity
+uniform float crunchiness = 0.6;                     // @range 0 1 @label Crunchiness
+uniform float strokeAmount = 0.35;                   // @range 0 1 @label Stroke Strength
+uniform float lightTint = 0.6;                       // @range 0 1 @label Light Colour Tint
+
+void main() {
+  // Strokes
+  vec3 dir = vec3(cos(strokeRotation), sin(strokeRotation) * 0.7, sin(strokeRotation) * 0.7);
+  vec3 p = object_pos;
+  float a = dot(p, dir);
+  vec3 across = p - dir * a;
+  float s = noise(across * strokeScale * 2.5 + dir * a * strokeScale * 0.4, 1.0, complexity, 0.55, 2.0);
+  float edge = mix(0.3, 0.02, crunchiness);
+  s = smoothstep(0.5 - edge, 0.5 + edge, s);
+
+  // Light picks the colour
+  float l = max(dot(normal, light_dir), 0.0) * length(light_color) * 0.577;
+  float t = saturate(l * 0.9 + 0.05 + (s - 0.5) * strokeAmount);
+  vec3 c = mix(shadowHue, coolHue, smoothstep(0.0, 0.25, t));
+  c = mix(c, midHue, smoothstep(0.25, 0.5, t));
+  c = mix(c, warmHue, smoothstep(0.5, 0.75, t));
+  c = mix(c, lightHue, smoothstep(0.75, 1.0, t));
+  c = mix(c, c * normalize(light_color + vec3(0.001, 0.001, 0.001)) * 1.732, lightTint * t);
+  color = c;
+}

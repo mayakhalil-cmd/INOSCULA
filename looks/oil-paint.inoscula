@@ -1,0 +1,202 @@
+// Impasto: thick oil strokes that follow the form
+name "Impasto";
+shading "lit";
+surface "cutout";
+cards 2400, 0.05, 0.42, 0.9;
+
+uniform vec3 deepPaint = vec3(0.03, 0.012, 0.04);  // @color @label Deep Shadow
+uniform vec3 midPaint = vec3(0.16, 0.07, 0.13);  // @color @label Mid Tone
+uniform vec3 warmLight = vec3(0.72, 0.62, 0.5);       // @color @label Warm Light
+uniform vec3 coolLight = vec3(0.92, 0.32, 0.12);      // @color @label Cool Light
+uniform vec3 hotPaint = vec3(1.0, 0.85, 0.68);      // @color @label Highlight
+uniform vec3 shadowAccent = vec3(0.04, 0.13, 0.2);  // @color @label Shadow Accent
+uniform vec3 midAccent = vec3(0.32, 0.06, 0.2);        // @color @label Mid Accent
+uniform vec3 lightAccent = vec3(0.95, 0.5, 0.35);    // @color @label Light Accent
+uniform vec3 sheenA = vec3(0.2, 0.55, 0.75);          // @color @label Sheen Colour A
+uniform vec3 sheenB = vec3(0.85, 0.3, 0.45);          // @color @label Sheen Colour B
+uniform float variety = 0.35;                         // @range 0 1 @label Colour Variety
+uniform float sheen = 0.45;                           // @range 0 1 @label Sheen
+uniform float groundAware = 1.0;                      // @range 0 1 @label Calm Paint On Big Flat Surfaces
+uniform vec3 keyPos = vec3(3.5, 0.8, 3.0);          // @label Key Light Position
+uniform float keyPoint = 0.0;                        // @range 0 1 @label Lights From Positions (0: follow the scene's sun)
+uniform vec3 fillPos = vec3(-3.5, 0.8, 3.0);       // @label Fill Light Position
+uniform float ambient = 0.08;                        // @range 0 0.5 @label Room Light
+uniform float falloff = 0.6;                         // @range 0 2 @label Light Falloff
+uniform float fillStrength = 0.6;                    // @range 0 1.5 @label Fill Light
+uniform float strokeSize = 2.4;                      // @range 2 30 @label Stroke Density
+uniform float adapt = 1.0;                           // @range 0 1 @label Adapt To Object
+uniform float followView = 1.0;                      // @range 0 1 @label Strokes Follow The View
+uniform float strokeLength = 3.2;                    // @range 1 8 @label Stroke Length
+uniform float combing = 1.6;                         // @range 0 4 @label Dragged Edges
+uniform float tilt = 0.25;                           // @range 0 1.5 @label Stroke Planes
+uniform float steps = 6.0;                           // @range 2 12 @label Paint Values
+uniform float stepped = 0.15;                        // @range 0 1 @label Value Steps At Dab Edges
+uniform float crevices = 0.7;                        // @range 0 1 @label Dark Crevices (needs Prepare model)
+uniform float jitter = 0.05;                         // @range 0 0.5 @label Value Jitter
+uniform float bodyLight = 0.45;                      // @range 0 1 @label Real Light On The Paint
+uniform float impasto = 4.5;                         // @range 0 8 @label Impasto Depth
+uniform float relief = 0.8;                          // @range 0 2 @label Paint Relief
+uniform float reliefAngle = 0.5;                     // @range -3.1416 3.1416 @label Relief Light Angle
+uniform float canvas = 0.8;                          // @range 0 1 @label Canvas Texture
+uniform float edgeBreak = 0.6;                       // @range 0 1 @label Edge Breakup
+uniform float edgeShadow = 0.9;                      // @range 0 1 @label Edge Shadow
+uniform float drift = 0.0;                           // @range 0 1 @label Drift
+uniform float fps = 8.0;                             // @range 0 24 @label Repaint FPS
+uniform float repaint = 0.0;                         // @range 0 1 @label Repaint Amount
+uniform float lineWidth = 0.03;                      // @range 0 0.05 @label Edge Line Width
+uniform vec3 lineColor = vec3(0.013, 0.006, 0.013); // @color @label Edge Line Colour
+
+vec3 crossv(vec3 a, vec3 b) {
+  return vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+}
+
+// One coat of dabs
+vec3 dabCoat(vec3 p, vec3 n, vec3 axis, float size, float len, vec3 seed) {
+  // Two overlapping sets of patches
+  vec3 pp = p + seed;
+  float pa = voronoi(pp, size * 0.3, 1.0);
+  float pb = voronoi(pp + vec3(17.3, 9.1, 4.7), size * 0.3, 1.0);
+  float useB = step(pb + (noise(pp * size * 0.9, 1.0, 2.0, 0.5, 2.0) - 0.5) * 0.25, pa);
+  vec3 pc = mix(pa.position, pb.position - vec3(17.3, 9.1, 4.7), useB);
+  vec3 pr = mix(pa.color, pb.color, useB);
+  // Strokes follow the form
+  vec3 tA = crossv(n, axis);
+  vec3 tB = crossv(n, normalize(p + vec3(0.0001, 0.0002, 0.0003)));
+  vec3 t = normalize(tA + tB * saturate(1.0 - length(tA) * 2.0) * 2.0 + crossv(n, vec3(0.31, 0.47, 0.83)) * 0.3 + vec3(0.0001, 0.0002, 0.0003));
+  // Each patch turns a little
+  t = normalize(t + crossv(n, t) * (pr.x - 0.5) * mix(0.45, 4.0, saturate(1.0 - length(tA) * 2.5)));
+  vec3 o = pp - pc;
+  float along = dot(o, t);
+  // Rounder dabs facing the camera
+  float lenHere = mix(len, 1.0, pow(saturate(dot(n, axis)), 6.0));
+  vec3 o2 = (o - t * along) * lenHere + t * along;
+  // Dragged dab ends
+  float comb = noise((o - t * along) * size * lenHere * 2.5 + pr * 5.0, 1.0, 2.0, 0.5, 2.0);
+  o2 = o2 + t * (comb - 0.5) * (combing / size);
+  float d = voronoi(o2 + pr * 37.0, size, 1.0);
+  vec3 r = d.color;
+  float streak = noise((o - t * along) * size * lenHere * 5.0 + t * along * size * 0.7 + pr * 11.0, 1.0, 2.0, 0.5, 2.0);
+  // Paint height
+  float h = (1.0 - d) * 0.3 + streak * 0.1;
+  return vec3(r.x, h, streak);
+}
+
+// Brush position
+vec3 adaptPos(vec3 op, vec3 on) {
+  // Size scaling
+  return op * pow(2.6 / max(object_size, 0.001), adapt * 0.7);
+}
+
+// Two coats
+vec3 paint2(vec3 p, vec3 n, vec3 axis, float size, float len, vec3 seed) {
+  vec3 a = dabCoat(p, n, axis, size, len, seed);
+  vec3 b = dabCoat(p, n, axis, size * 1.4, len, seed + vec3(5.1, 2.3, 7.7));
+  float top = step(0.5, hash(vec3(floor(b.x * 997.0), 1.0, 1.0)));
+  return vec3(mix(a.x, b.x, top), mix(a.y, 1.0 + b.y, top), mix(a.z, b.z, top));
+}
+
+void main() {
+  float frame = floor(time * fps);
+  vec3 seed = vec3(hash(vec3(frame, 1.0, 9.0)), hash(vec3(frame, 2.0, 9.0)), hash(vec3(frame, 3.0, 9.0))) * repaint * 3.0 + vec3(time * drift * 0.1, 0.0, time * drift * 0.05);
+  vec3 V = view_dir;
+  vec3 right = normalize(crossv(vec3(0.0, 0.0, 1.0), V) + vec3(0.0001, 0.0, 0.0));
+  vec3 upv = crossv(V, right);
+  vec3 rel = upv * cos(reliefAngle) + right * sin(reliefAngle);
+  vec3 n = normal;
+  vec3 p = adaptPos(object_pos, object_normal);
+  // Calm paint on large flat surfaces
+  float ground = smoothstep(4.0, 12.0, object_size) * groundAware;
+
+  // Brush cards
+  float card = step(99.5, uv.x);
+  float cid = floor(uv.x);
+  float ca = uv.x - cid;
+  float cb = abs(uv.y - 0.5) * 2.0;
+  vec3 cr = vec3(hash(vec3(cid, 1.0, 0.0)), hash(vec3(cid, 2.0, 0.0)), hash(vec3(cid, 3.0, 0.0)));
+  float cstreak = noise(vec3(uv.y * 18.0, ca * 1.5, cr.x * 40.0), 1.0, 3.0, 0.5, 2.0);
+  float cardShape = step(0.72, sqrt(saturate(1.0 - dot(normal, view_dir)))) * step(cb, 0.85 - smoothstep(0.75, 1.0, ca) * 0.5 * cstreak) * step(0.06, ca) * step(smoothstep(0.6, 1.0, ca) * 0.8, cstreak + 0.15);
+
+  // Stroke field
+  vec3 axis = normalize(mix(vec3(0.0, 0.0, 1.0), V, followView));
+  vec3 pt = paint2(p, n, axis, strokeSize, strokeLength, seed);
+  float rnd = mix(pt.x, cr.x, card);
+  float rnd2 = mix(fract(pt.x * 7.13), cr.y, card);
+  float streak = mix(pt.z, cstreak, card);
+  float e = mix((pt.z - 0.5) * 0.35 * smoothstep(0.1, 0.4, fract(pt.y)), (cstreak - 0.5) * 0.4, card);
+
+  // Sweeping strokes on large surfaces
+  vec3 gp = p + seed;
+  float gx = dot(gp, right);
+  float gy = dot(gp, upv);
+  float gr = sqrt(gx * gx + gy * gy) + 0.0001;
+  // Stretched along the circle
+  float gw = smoothstep(0.03, 0.25, gr);
+  vec3 gq = vec3(gr * strokeSize * 6.0, gx / gr * 3.0, gy / gr * 3.0) * gw + gp * strokeSize * 2.0 * (1.0 - gw);
+  float gs = saturate((noise(gq, 1.0, 3.0, 0.6, 2.0) - 0.28) * 2.3);
+  float gst = noise(vec3(gr * strokeSize * 60.0, gx / gr * 5.0, gy / gr * 5.0) * gw + gp * strokeSize * 12.0 * (1.0 - gw), 1.0, 2.0, 0.5, 2.0);
+  rnd = mix(rnd, floor(gs * 7.0) / 7.0 + 0.07, ground);
+  rnd2 = mix(rnd2, fract(floor(gs * 7.0) * 0.37), ground);
+  streak = mix(streak, gst, ground);
+  e = mix(e, (gst - 0.5) * 0.05, ground);
+
+  // Each dab is one flat plane
+  vec3 tiltv = vec3(rnd - 0.5, rnd2 - 0.5, hash(vec3(rnd, rnd2, 4.0)) - 0.5);
+  vec3 np = normalize(n + tiltv * tilt);
+  vec3 L = normalize(mix(light_dir, normalize(keyPos - world_pos), keyPoint));
+  vec3 F = normalize(mix(L - right * (2.0 * dot(L, right)) + vec3(0.0, 0.0, 0.3), normalize(fillPos - world_pos), keyPoint));
+  float ka = mix(1.0, 2.2 / (1.0 + falloff * 0.12 * dot(keyPos - world_pos, keyPos - world_pos)), keyPoint);
+  float fa = mix(1.0, 2.2 / (1.0 + falloff * 0.12 * dot(fillPos - world_pos, fillPos - world_pos)), keyPoint);
+  float kd = saturate(dot(np, L) * ka + (rnd - 0.5) * jitter + (streak - 0.5) * 0.15);
+  float fd = pow(saturate(dot(np, F) * fa), 1.6) * fillStrength;
+  float lightAmt = (max(kd, fd) + ambient) * mix(1.0, occlusion, crevices);
+  lightAmt = lightAmt + (rnd - 0.5) * 0.7 * ground;
+  // Value steps
+  lightAmt = mix(lightAmt, (floor(lightAmt * steps + rnd2) + 0.5) / steps, stepped);
+  // Palette
+  float pick = step(1.0 - variety, rnd2);
+  vec3 shadowCol = mix(deepPaint, shadowAccent, pick);
+  vec3 midCol = mix(midPaint, midAccent, pick);
+  vec3 litCol = mix(coolLight, warmLight, smoothstep(-0.1, 0.1, kd - fd));
+  litCol = mix(litCol, lightAccent, pick * 0.8);
+  vec3 c = shadowCol;
+  c = mix(c, midCol, smoothstep(0.12, 0.34, lightAmt));
+  c = mix(c, litCol, smoothstep(0.38, 0.6, lightAmt));
+  c = mix(c, hotPaint, smoothstep(0.9, 0.99, kd) * 0.5);
+  // Sheen
+  vec3 rv = reflect(vec3(0.0) - V, np);
+  float glance = smoothstep(0.35, 0.95, max(dot(rv, L), dot(rv, F) * fillStrength));
+  c = mix(c, mix(sheenA, sheenB, step(0.5, fract(rnd * 3.7))), glance * sheen * step(0.35, rnd2) * (1.0 - ground));
+
+  c = c * (1.0 - (0.14 - 0.28 * streak) * (1.0 - smoothstep(0.45, 0.75, lightAmt) * 0.75));
+
+  // Relief
+  float up = saturate(e * 2.5 * relief * (1.0 - ground * 0.9));
+  float down = saturate(0.0 - e * 2.5 * relief * (1.0 - ground * 0.9));
+  c = mix(c, c * 1.6 + vec3(0.05, 0.04, 0.04), up * 0.8);
+  c = c * (1.0 - down * 0.75 * (1.0 - smoothstep(0.45, 0.8, lightAmt) * 0.6));
+
+  // Canvas weave
+  float wx = sin(dot(world_pos, right) * 150.0);
+  float wy = sin(dot(world_pos, upv) * 150.0);
+  c = c * (1.0 - canvas * (0.07 + ground * 0.1) * (wx * 0.5 + 0.5) * (wy * 0.5 + 0.5) * smoothstep(0.5, 0.8, lightAmt) * (1.0 - card));
+
+  // Edge
+  float rad = sqrt(saturate(1.0 - dot(n, V)));
+  vec3 sn = right * dot(n, right) + upv * dot(n, upv);
+  float facingRelief = dot(normalize(sn + vec3(0.0001, 0.0, 0.0)), rel);
+  float crest = smoothstep(0.8, 0.93, rad + (rnd - 0.5) * 0.1) * (1.0 - card);
+  c = mix(c, mix(c, hotPaint, 0.5), crest * saturate(facingRelief) * relief * 0.6);
+  c = c * (1.0 - crest * saturate(0.0 - facingRelief) * edgeShadow * 0.6);
+  c = c * (1.0 - smoothstep(0.84, 0.92, rad + (rnd - 0.5) * 0.06) * (1.0 - smoothstep(0.95, 0.99, rad)) * edgeShadow * 0.7 * (1.0 - card));
+  float keep = step(rad, 1.0 - edgeBreak * 0.12 * rnd);
+
+  color = c * bodyLight;
+  emission = c * (1.0 - bodyLight * 0.75);
+  roughness = 0.6 - pt.z * 0.2;
+  metallic = 0.0;
+  bump = (mix(pt.y, 0.0, ground) + streak * 0.15) * impasto * (0.08 / strokeSize) * pow(object_size / 2.6, adapt * 0.7) * (1.0 - card);
+  alpha = mix(keep, cardShape, card);
+  outline = lineWidth;
+  outline_color = lineColor;
+  outline_breakup = 0.55;
+}

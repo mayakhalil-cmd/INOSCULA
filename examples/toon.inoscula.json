@@ -1,0 +1,24 @@
+{
+  "inoscula": "0.1",
+  "name": "Toon Bands",
+  "params": [
+    { "id": "shadow", "type": "color", "default": [0.05, 0.04, 0.12], "label": "Shadow" },
+    { "id": "mid", "type": "color", "default": [0.55, 0.18, 0.35], "label": "Mid" },
+    { "id": "lit", "type": "color", "default": [1.0, 0.72, 0.45], "label": "Lit" },
+    { "id": "soft", "type": "float", "default": 0.04, "min": 0, "max": 0.3, "label": "Softness" }
+  ],
+  "nodes": [
+    { "id": "n", "op": "normal" },
+    { "id": "l", "op": "light_dir" },
+    { "id": "ndl", "op": "dot", "in": { "a": "n", "b": "l" } },
+    { "id": "lo", "op": "sub", "in": { "a": 0.0, "b": "$soft" } },
+    { "id": "hi", "op": "add", "in": { "a": 0.0, "b": "$soft" } },
+    { "id": "lo2", "op": "add", "in": { "a": 0.55, "b": "lo" } },
+    { "id": "hi2", "op": "add", "in": { "a": 0.55, "b": "hi" } },
+    { "id": "b1", "op": "smoothstep", "in": { "e0": "lo", "e1": "hi", "x": "ndl" } },
+    { "id": "b2", "op": "smoothstep", "in": { "e0": "lo2", "e1": "hi2", "x": "ndl" } },
+    { "id": "c1", "op": "mix", "in": { "a": "$shadow", "b": "$mid", "t": "b1" } },
+    { "id": "c2", "op": "mix", "in": { "a": "c1", "b": "$lit", "t": "b2" } }
+  ],
+  "output": { "color": "c2" }
+}

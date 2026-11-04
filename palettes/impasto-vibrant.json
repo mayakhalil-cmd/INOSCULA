@@ -1,0 +1,4 @@
+{
+ "duo": {"deepPaint":[0.0,0.09,0.05],"midPaint":[0.0,0.32,0.17],"shadowAccent":[0.0,0.18,0.12],"midAccent":[0.0,0.42,0.2],"coolLight":[1.0,0.08,0.35],"warmLight":[1.0,0.18,0.42],"lightAccent":[1.0,0.35,0.55],"hotPaint":[1.0,0.62,0.78],"sheenA":[0.1,1.0,0.5],"sheenB":[1.0,0.3,0.6],"variety":0.3,"fillStrength":0.35,"lineColor":[0.0,0.05,0.03]},
+ "trio": {"deepPaint":[0.03,0.0,0.09],"midPaint":[0.0,0.38,0.22],"shadowAccent":[0.12,0.0,0.22],"midAccent":[0.0,0.5,0.34],"coolLight":[1.0,0.06,0.4],"warmLight":[1.0,0.2,0.32],"lightAccent":[1.0,0.42,0.18],"hotPaint":[1.0,0.85,0.45],"sheenA":[0.15,1.0,0.6],"sheenB":[1.0,0.55,0.1],"variety":0.35,"fillStrength":0.45,"lineColor":[0.02,0.0,0.06]}
+}

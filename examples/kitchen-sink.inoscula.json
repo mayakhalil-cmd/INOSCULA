@@ -1,0 +1,42 @@
+{
+  "inoscula": "0.1",
+  "name": "Kitchen Sink",
+  "params": [
+    { "id": "freq", "type": "float", "default": 9.0, "min": 1, "max": 40, "label": "Frequency" },
+    { "id": "tint", "type": "color", "default": [0.2, 0.6, 1.0], "label": "Tint" }
+  ],
+  "nodes": [
+    { "id": "uv", "op": "uv" },
+    { "id": "op", "op": "object_pos" },
+    { "id": "on", "op": "object_normal" },
+    { "id": "wp", "op": "world_pos" },
+    { "id": "uvs", "op": "separate", "in": { "v": "uv" } },
+    { "id": "a", "op": "mul", "in": { "a": "uvs.x", "b": "$freq" } },
+    { "id": "sa", "op": "sin", "in": { "x": "a" } },
+    { "id": "ca", "op": "cos", "in": { "x": "a" } },
+    { "id": "st", "op": "smoothstep", "in": { "e0": -0.2, "e1": 0.2, "x": "sa" } },
+    { "id": "pw", "op": "pow", "in": { "a": "ca", "b": 3.0 } },
+    { "id": "pw2", "op": "pow", "in": { "a": "sa", "b": 0.5 } },
+    { "id": "gr", "op": "greater", "in": { "a": "uvs.y", "b": 0.5 } },
+    { "id": "fr", "op": "fract", "in": { "x": "op" } },
+    { "id": "fl", "op": "floor", "in": { "x": "wp" } },
+    { "id": "ab", "op": "abs", "in": { "x": "on" } },
+    { "id": "nz", "op": "normalize", "in": { "x": "op" } },
+    { "id": "ln", "op": "length", "in": { "x": "op" } },
+    { "id": "dv", "op": "div", "in": { "a": "fl", "b": "fr" } },
+    { "id": "dvc", "op": "clamp", "in": { "x": "dv", "lo": -1.0, "hi": 1.0 } },
+    { "id": "om", "op": "one_minus", "in": { "x": "ab" } },
+    { "id": "mx", "op": "max", "in": { "a": "om", "b": "nz" } },
+    { "id": "mn", "op": "min", "in": { "a": "mx", "b": [0.9, 0.8, 0.7] } },
+    { "id": "pv", "op": "pow", "in": { "a": "mn", "b": [2.0, 1.5, 3.0] } },
+    { "id": "cb", "op": "combine", "in": { "x": "st", "y": "pw", "z": "gr" } },
+    { "id": "m1", "op": "mix", "in": { "a": "cb", "b": "pv", "t": "ln" } },
+    { "id": "m2", "op": "mul", "in": { "a": "m1", "b": "$tint" } },
+    { "id": "m3", "op": "add", "in": { "a": "m2", "b": "dvc" } },
+    { "id": "m4", "op": "sub", "in": { "a": "m3", "b": "pw2" } },
+    { "id": "lr", "op": "ramp", "in": { "t": "ln" }, "set": { "mode": "linear", "stops": [[0.2, [1, 0, 0]], [0.6, [0, 1, 0]], [0.9, [0, 0, 1]]] } },
+    { "id": "out", "op": "mix", "in": { "a": "m4", "b": "lr", "t": 0.35 } },
+    { "id": "outc", "op": "clamp", "in": { "x": "out", "lo": 0.0, "hi": 1.0 } }
+  ],
+  "output": { "color": "outc" }
+}

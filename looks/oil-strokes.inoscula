@@ -1,0 +1,55 @@
+// Oil strokes: one brush stroke per card
+name "Oil Strokes";
+surface "cutout";
+cards 3500, 0.06, 0.34;
+
+uniform vec3 shadowPaint = vec3(0.07, 0.05, 0.14);  // @color @label Shadow Paint
+uniform vec3 midPaint = vec3(0.3, 0.13, 0.3);       // @color @label Mid Paint
+uniform vec3 lightPaint = vec3(0.8, 0.3, 0.22);     // @color @label Light Paint
+uniform vec3 hotPaint = vec3(1.0, 0.72, 0.42);      // @color @label Highlight Paint
+uniform vec3 groundPaint = vec3(0.16, 0.08, 0.14);  // @color @label Underpainting
+uniform float brushiness = 0.16;                     // @range 0 1 @label Stroke Value Jitter
+uniform float hueJitter = 0.25;                      // @range 0 1 @label Stroke Colour Jitter
+uniform float bristles = 0.6;                        // @range 0 1 @label Bristles
+uniform float dryBrush = 0.55;                       // @range 0 1 @label Dry Brush
+uniform float thickness = 0.9;                       // @range 0 1 @label Paint Thickness
+
+vec3 bands(float t) {
+  vec3 c = shadowPaint;
+  c = mix(c, midPaint, smoothstep(0.42, 0.44, t));
+  c = mix(c, lightPaint, smoothstep(0.62, 0.64, t));
+  c = mix(c, hotPaint, smoothstep(0.88, 0.9, t));
+  return c;
+}
+
+void main() {
+  float card = step(99.5, uv.x);
+  float id = floor(uv.x);
+  float a = uv.x - id;
+  float b = uv.y;
+  vec3 rs = vec3(hash(vec3(id, 1.0, 0.0)), hash(vec3(id, 2.0, 0.0)), hash(vec3(id, 3.0, 0.0)));
+
+  // Stroke shape
+  float across = abs(b - 0.5) * 2.0;
+  float streak = noise(vec3(b * 22.0, a * 1.2, rs.x * 40.0), 1.0, 3.0, 0.55, 2.0);
+  float head = sqrt(saturate(a / 0.22));
+  float width = head * (1.0 - smoothstep(0.55, 1.0, a) * 0.55) * 0.82;
+  width = width * (0.88 + 0.24 * noise(vec3(a * 3.0, rs.y * 30.0, 0.0), 1.0, 2.0, 0.5, 2.0));
+  float dryness = smoothstep(0.45, 1.0, a) * dryBrush + across * across * dryBrush * 0.5;
+  float stroke = step(across, width) * step(dryness, streak + 0.2);
+  alpha = mix(1.0, stroke, card);
+
+  // Light
+  float l = dot(normal, light_dir) * 0.5 + 0.5;
+  float ground = noise(object_pos, 3.0, 2.0, 0.5, 2.0);
+  float t = l + mix((ground - 0.5) * brushiness * 0.6, (rs.x - 0.5) * brushiness, card);
+  vec3 c = bands(t);
+  c = mix(c * (1.0 + (rs - vec3(0.5, 0.5, 0.5)) * hueJitter * 0.5), c, 1.0 - card);
+  c = mix(mix(c, groundPaint, 0.35), c, card);
+
+  // Paint body
+  float ridge = 1.0 - across * across;
+  c = c * (1.0 - thickness * 0.25 + thickness * 0.35 * ridge * card);
+  c = c * (1.0 - bristles * 0.3 + bristles * 0.55 * streak * card);
+  color = c;
+}

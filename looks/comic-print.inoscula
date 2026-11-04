@@ -1,0 +1,45 @@
+// Comic print: halftone, hatching, off-register ink
+name "Comic Print";
+
+uniform vec3 paper = vec3(0.98, 0.93, 0.80);  // @color @label Paper
+uniform vec3 base = vec3(0.86, 0.10, 0.16);   // @color @label Base Colour
+uniform vec3 shade = vec3(0.10, 0.12, 0.45);  // @color @label Shadow Ink
+uniform vec3 ink = vec3(0.03, 0.02, 0.05);    // @color @label Line Ink
+uniform float dots = 14.0;                     // @range 4 40 @label Dot Density
+uniform float line = 0.32;                     // @range 0 0.7 @label Line Weight
+uniform float fps = 12.0;                      // @range 1 24 @label Boil FPS
+uniform float misprint = 0.03;                 // @range 0 0.1 @label Misregistration
+
+void main() {
+  float frame = floor(time * fps);
+  vec3 jit = vec3(hash(vec3(frame, 1.0, 0.0)), hash(vec3(frame, 2.0, 0.0)), hash(vec3(frame, 3.0, 0.0)));
+
+  // Three tone steps from the light
+  float ndl = dot(normal, light_dir);
+  float tone = smoothstep(-0.35, 0.65, ndl);
+
+  // Halftone
+  vec3 cell = fract(object_pos * dots) - vec3(0.5);
+  float radius = sqrt(1.0 - tone) * 0.62;
+  float dot1 = 1.0 - smoothstep(radius - 0.06, radius, length(cell));
+
+  // Second ink layer
+  vec3 cell2 = fract((object_pos + vec3(misprint)) * dots) - vec3(0.5);
+  float dot2 = 1.0 - smoothstep(radius * 0.8 - 0.06, radius * 0.8, length(cell2));
+
+  // Hatching in the deepest shadow
+  float hatch = step(0.5, fract((object_pos.x + object_pos.z) * dots * 0.5));
+  float deep = 1.0 - smoothstep(0.0, 0.25, tone);
+
+  vec3 c = mix(base, paper, smoothstep(0.88, 0.97, tone) * 0.7);
+  c = mix(c, shade, dot1 * 0.85);
+  c = mix(c, base * 0.55, dot2 * 0.35 * (1.0 - tone));
+  c = mix(c, ink, hatch * deep * 0.7);
+
+  // Ink outline at the silhouette
+  float wob = noise(object_pos * 2.5 + jit * 10.0, 3.0, 1.0, 0.5, 2.0);
+  float edge = 1.0 - max(dot(normal, view_dir), 0.0);
+  float w = line * (0.6 + 0.8 * wob);
+  float inkLine = smoothstep(1.0 - w, 1.0 - w + 0.04, edge);
+  color = mix(c, ink, inkLine);
+}

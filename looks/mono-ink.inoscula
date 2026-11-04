@@ -1,0 +1,37 @@
+// Mono ink: black ink masses and dry brush
+name "Mono Ink";
+
+uniform vec3 paper = vec3(0.93, 0.91, 0.86);  // @color @label Paper
+uniform vec3 ink = vec3(0.04, 0.04, 0.05);    // @color @label Ink
+uniform float threshold = 0.2;                 // @range -0.6 0.8 @label Ink Level
+uniform float dry = 0.6;                       // @range 0 1 @label Dry Brush
+uniform float line = 0.3;                      // @range 0 0.7 @label Outline
+uniform float fps = 8.0;                       // @range 0 24 @label Boil FPS
+
+void main() {
+  float frame = floor(time * fps);
+  vec3 jit = vec3(hash(vec3(frame, 4.0, 2.0)), hash(vec3(frame, 5.0, 2.0)), hash(vec3(frame, 6.0, 2.0)));
+  vec3 p = object_pos;
+
+  // Brush strokes run in one direction
+  float strokes = noise(p * vec3(1.0, 1.0, 9.0) + jit * 4.0, 6.0, 4.0, 0.6, 2.0);
+  float bristle = noise(p * vec3(1.0, 1.0, 40.0) + jit, 30.0, 2.0, 0.5, 2.0);
+  float ndl = dot(normal, light_dir);
+  float tone = ndl + (strokes - 0.5) * 0.6;
+  float mass = 1.0 - smoothstep(threshold - 0.03, threshold + 0.03, tone);
+  float dryGaps = smoothstep(0.55 - dry * 0.2, 0.75, bristle) * smoothstep(threshold - 0.25, threshold, tone);
+  float inkAmt = saturate(mass - dryGaps * dry);
+
+  // Second layer
+  float wash = (1.0 - smoothstep(threshold + 0.2, threshold + 0.45, tone)) * 0.35;
+
+  // Wobbly brush outline
+  float edge = 1.0 - max(dot(normal, view_dir), 0.0);
+  float wob = noise(p * 3.0 + jit * 9.0, 2.0, 2.0, 0.5, 2.0);
+  float w = line * (0.5 + wob);
+  float inkLine = smoothstep(1.0 - w, 1.0 - w + 0.05, edge);
+
+  float paperGrain = noise(p, 120.0, 1.0, 0.5, 2.0);
+  vec3 c = mix(paper * (0.96 + 0.06 * paperGrain), ink, max(max(inkAmt, wash), inkLine));
+  color = c;
+}

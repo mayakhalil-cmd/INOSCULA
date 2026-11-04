@@ -1,0 +1,21 @@
+// Grain gradient: colour bands with a grainy blend
+name "Grain Gradient";
+
+uniform vec3 dark = vec3(0.13, 0.10, 0.36);  // @color @label Dark
+uniform vec3 mid = vec3(0.96, 0.36, 0.42);   // @color @label Mid
+uniform vec3 light = vec3(1.0, 0.86, 0.55);  // @color @label Light
+uniform float spread = 0.35;                  // @range 0 1 @label Grain Spread
+uniform float speckle = 220.0;                // @range 40 600 @label Speckle Size
+uniform float fps = 12.0;                     // @range 1 24 @label Frames Per Second
+
+void main() {
+  float frame = floor(time * fps);
+  float tone = smoothstep(-0.6, 1.0, dot(normal, light_dir));
+  float g = hash(floor(object_pos * speckle) + vec3(frame * 0.37));
+  float t = tone + (g - 0.5) * spread;
+  // Three flat bands
+  float isMid = step(0.42, t) * (1.0 - step(0.74, t));
+  float isLight = step(0.74, t);
+  vec3 pick = mix(mix(dark, mid, isMid), light, isLight);
+  color = pick;
+}

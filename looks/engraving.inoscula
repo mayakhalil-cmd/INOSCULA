@@ -1,0 +1,21 @@
+// Engraving: cross-hatching weighted by light
+name "Engraving";
+
+uniform vec3 paper = vec3(0.96, 0.93, 0.86);  // @color @label Paper
+uniform vec3 ink = vec3(0.10, 0.08, 0.12);    // @color @label Ink
+uniform float density = 22.0;                  // @range 5 80 @label Line Density
+
+void main() {
+  float tone = smoothstep(-0.5, 1.0, dot(normal, light_dir));
+  float wob = noise(object_pos, 6.0, 2.0, 0.5, 2.0) * 0.6;
+  float a = fract((object_pos.x + object_pos.z * 0.6 + wob * 0.1) * density);
+  float b = fract((object_pos.y - object_pos.x * 0.5 + wob * 0.1) * density);
+  float w1 = (1.0 - tone) * 0.9;
+  float w2 = (0.55 - tone) * 1.4;
+  float l1 = 1.0 - smoothstep(w1 * 0.5, w1 * 0.5 + 0.08, abs(a - 0.5));
+  float l2 = 1.0 - smoothstep(w2 * 0.5, w2 * 0.5 + 0.08, abs(b - 0.5));
+  float lines = max(l1, l2 * step(0.0, w2));
+  float edge = 1.0 - max(dot(normal, view_dir), 0.0);
+  float inkLine = smoothstep(0.72, 0.8, edge);
+  color = mix(paper, ink, max(lines, inkLine));
+}

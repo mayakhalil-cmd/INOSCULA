@@ -1,0 +1,38 @@
+// Iridescent: rainbow edges, sheen, grain
+name "RICO Iridescent";
+
+uniform float bands = 2.2;     // @range 0.5 6 @label Band Count
+uniform float hue = 0.0;       // @range 0 1 @label Hue Shift
+uniform float flow = 1.6;      // @range 0 6 @label Flow Scale
+uniform float sheen = 0.4;     // @range 0 2 @label Sheen
+uniform float rim = 0.9;       // @range 0 2 @label Rim
+uniform float grain = 0.28;    // @range 0 0.6 @label Grain
+uniform float speed = 0.15;    // @range 0 1 @label Drift Speed
+
+void main() {
+  float facing = max(dot(normal, view_dir), 0.0);
+  float edge = 1.0 - facing;
+  float f = noise(object_pos + vec3(0.0, 0.0, time * speed), flow, 2.0, 0.5, 2.0);
+
+  // Spectral bands
+  float x = edge * bands + f * 0.6 + hue;
+  vec3 spec = vec3(0.5) + 0.5 * cos(TAU * (vec3(x) + vec3(0.0, 0.27, 0.58)));
+  spec = spec * vec3(1.0, 0.82, 1.0);
+  spec = mix(spec, vec3(0.72, 0.66, 1.0), 0.1);
+  vec3 bandCol = pow(spec, vec3(1.6)) * (0.03 + 1.7 * pow(edge, 2.4)) * 1.5;
+
+  // Broad silver-lavender sheen
+  float env = pow(0.5 + 0.5 * cos(TAU * (normal.x * 0.9 + normal.y * 0.6 + f * 0.8)), 4.0);
+  vec3 sh = mix(vec3(0.62, 0.58, 1.0), vec3(1.0), env) * env * smoothstep(0.15, 0.7, facing) * sheen;
+
+  // Hot white line on the silhouette
+  vec3 rimLine = vec3(1.0) * exp(-facing * 26.0) * rim;
+  vec3 h = normalize(light_dir + view_dir);
+  float hl = pow(max(dot(normal, h), 0.0), 90.0);
+
+  vec3 c = vec3(0.015, 0.012, 0.03) + bandCol + sh + rimLine + vec3(1.3) * hl;
+
+  // Printed grain
+  float g = hash(floor(object_pos * 300.0) + vec3(floor(time * 12.0)));
+  color = c * (0.86 + grain * g);
+}

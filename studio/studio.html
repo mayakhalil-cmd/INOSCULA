@@ -1,0 +1,1124 @@
+<title>Inoscula Studio</title>
+<style>
+/*FONTS*/
+/* Layout: a working desk. Code or nodes on the left, the lit object on the right, the exports underneath.
+   RICO Engine's own system: true black, brand lime for anything live, pink for the press shadow, square edges. */
+:root {
+  --bg: #000000;
+  --surface: #030a01;
+  --surface-2: #071a02;
+  --line: #1a4a08;
+  --green: #3bff03;
+  --green-dim: #2a9c0a;
+  --pink: #f820a0;
+  --blue: #5c74ff;
+  --amber: #ffd23f;
+  --text: #ffffff;
+  --muted: #b9c7b3;
+  --font: 'Courier Prime', 'Courier New', Courier, monospace;
+  --font-title: 'Teletactile', 'VT323', 'Courier New', monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; margin: 0; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+code { color: var(--green); }
+
+.app { min-height: 100%; display: flex; flex-direction: column; gap: 14px;
+  padding-block: 14px 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; border-bottom: 2px solid var(--line); padding-bottom: 12px; }
+.logo { font-family: var(--font-title); font-size: 2.1rem; line-height: 1; color: var(--green); letter-spacing: 0.04em; text-shadow: 0 0 10px rgba(59, 255, 3, 0.45); margin: 0; }
+.logo span { color: var(--text); text-shadow: none; }
+.sub { color: var(--muted); font-size: 0.82rem; max-width: 36ch; line-height: 1.35; }
+.bar .grow { flex: 1 1 auto; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+.btn { font-family: var(--font-title); font-size: 1.05rem; letter-spacing: 0.06em; text-transform: uppercase; background: transparent;
+  color: var(--green); border: 2px solid var(--green); border-radius: 0; padding: 5px 12px 4px; cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s, background 0.12s, color 0.12s; }
+.btn:hover { background: var(--green); color: #000; box-shadow: 4px 4px 0 var(--pink); transform: translate(-2px, -2px); }
+.btn.solid { background: var(--green); color: #000; }
+.btn.ghost { border-color: var(--line); color: var(--muted); }
+.btn.ghost:hover { border-color: var(--green); }
+.btn.small { font-size: 0.95rem; padding: 2px 9px 1px; }
+select.btn { padding-right: 8px; max-width: 100%; }
+select.btn option, select.btn optgroup { background: #000; color: var(--text); font-family: var(--font); }
+.pill { font-family: var(--font-title); font-size: 0.95rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px 1px; border: 1px solid var(--line); color: var(--muted); }
+.pill.on { border-color: var(--green); color: var(--green); }
+.pill.warn { border-color: var(--amber); color: var(--amber); }
+
+.desk { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; }
+.frame { border: 2px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-width: 0; }
+.frame.live { border-color: var(--green); }
+.head { display: flex; align-items: center; gap: 10px; justify-content: space-between; padding: 6px 10px; border-bottom: 2px solid var(--line); flex-wrap: wrap;
+  font-family: var(--font-title); font-size: 1.05rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.head b { color: var(--green); font-weight: normal; }
+.head .r { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-family: var(--font-title); font-size: 0.95rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 9px 1px; border: 1px solid var(--line);
+  background: transparent; color: var(--muted); cursor: pointer; border-radius: 0; }
+.chip:hover { border-color: var(--green); color: var(--green); }
+.chip.on { background: var(--green); color: #000; border-color: var(--green); }
+.chip:disabled { opacity: 0.4; cursor: default; }
+select.chip { padding-right: 4px; }
+select.chip option { background: #000; color: var(--text); }
+
+/* editor */
+.editor { position: relative; flex: 1 1 auto; min-height: 560px; display: grid; grid-template-columns: auto minmax(0, 1fr); overflow: hidden; }
+.gutter { padding: 12px 8px 12px 10px; text-align: right; color: var(--green-dim); user-select: none; font-size: 13px; line-height: 20px;
+  border-right: 1px solid var(--line); background: #010400; overflow: hidden; font-variant-numeric: tabular-nums; }
+.gutter div.bad { color: #000; background: var(--pink); }
+.gutter div.pick { color: #000; background: var(--green); }
+.code { position: relative; min-width: 0; }
+.code pre, .code textarea { position: absolute; inset: 0; margin: 0; padding: 12px 14px; font-family: var(--font); font-size: 13px; line-height: 20px;
+  white-space: pre; overflow: auto; tab-size: 2; border: 0; }
+.code pre { pointer-events: none; color: var(--text); }
+.code textarea { background: transparent; color: transparent; caret-color: var(--green); resize: none; outline: none; }
+.code textarea::selection { background: rgba(59, 255, 3, 0.28); color: transparent; }
+.t-kw { color: var(--green); } .t-ty { color: var(--blue); } .t-num { color: var(--pink); } .t-str { color: var(--amber); }
+.t-com { color: #6f8a66; font-style: italic; } .t-in { color: #8ff6ff; } .t-fn { color: #c9ffb3; } .t-out { color: var(--amber); }
+
+/* node view */
+.nodes { flex: 1 1 auto; min-height: 560px; height: 0; overflow: auto; background: #010400; position: relative; cursor: grab; }
+.nodes svg { display: block; }
+.nodes .n rect { fill: var(--surface-2); stroke: var(--line); stroke-width: 1.5; }
+.nodes .n.src rect { stroke: #2d7a8a; }
+.nodes .n.out rect { stroke: var(--amber); }
+.nodes .n:hover rect, .nodes .n.sel rect { stroke: var(--green); }
+.nodes .n text { font-family: var(--font); font-size: 11px; fill: var(--muted); }
+.nodes .n text.title { font-family: var(--font-title); font-size: 14px; fill: var(--green); letter-spacing: 0.05em; }
+.nodes path.w { fill: none; stroke: var(--green-dim); stroke-width: 1.4; opacity: 0.7; }
+.nodes path.w.v { stroke: var(--blue); }
+.nodes .lit { fill: var(--pink); }
+
+.status { border-top: 2px solid var(--line); padding: 8px 10px; font-size: 0.84rem; line-height: 1.4; min-height: 2.6em; color: var(--muted); }
+.status.ok b { color: var(--green); }
+.status.err { color: #fff; background: #2a0418; border-top-color: var(--pink); }
+.status.err b { color: var(--pink); }
+
+/* preview */
+.view { position: relative; aspect-ratio: 4 / 3; max-width: 100%; background: #000; cursor: grab; touch-action: none; }
+.view canvas { width: 100%; height: 100%; display: block; }
+.view .hint { position: absolute; left: 10px; bottom: 8px; font-size: 0.75rem; color: var(--muted); pointer-events: none; text-shadow: 0 0 4px #000; }
+.view .busy { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.7); font-family: var(--font-title); font-size: 1.4rem; color: var(--green); letter-spacing: 0.06em; }
+.lightbar { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 6px 10px; border-bottom: 2px solid var(--line); color: var(--muted); font-size: 0.82rem; }
+.lightbar label { display: flex; gap: 6px; align-items: center; }
+.notes { padding: 8px 12px; border-bottom: 1px solid var(--line); display: grid; gap: 4px; font-size: 0.8rem; line-height: 1.4; color: var(--muted); }
+.notes div::before { content: "\25A0  "; }
+.notes .same::before { color: var(--green); } .notes .close::before { color: var(--amber); } .notes .missing::before { color: var(--pink); }
+
+.panel { padding: 10px 12px 14px; display: grid; gap: 10px; }
+.row { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr) 3.6rem 1.8rem; gap: 10px; align-items: center; }
+.row label { color: var(--muted); font-size: 0.85rem; overflow-wrap: anywhere; }
+.row output { font-variant-numeric: tabular-nums; color: var(--green); font-size: 0.85rem; text-align: right; }
+.row .lfo { width: 1.8rem; height: 1.5rem; padding: 0; font-size: 0.85rem; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.row .lfo.on { background: var(--pink); border-color: var(--pink); color: #000; }
+input[type=range] { width: 100%; accent-color: var(--green); }
+input[type=color] { width: 100%; height: 26px; border: 1px solid var(--line); background: #000; padding: 1px; border-radius: 0; cursor: pointer; }
+.sect { font-family: var(--font-title); font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--green-dim); border-top: 1px dashed var(--line); padding-top: 8px; }
+.sect:first-child { border-top: 0; padding-top: 0; }
+
+.out { display: flex; flex-direction: column; }
+.tabs { display: flex; flex-wrap: wrap; border-bottom: 2px solid var(--line); }
+.tab { font-family: var(--font-title); font-size: 1.05rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 12px 4px; border: 0;
+  border-right: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.tab:hover { color: var(--green); }
+.tab.on { background: var(--green); color: #000; }
+.how { padding: 8px 12px; color: var(--muted); font-size: 0.85rem; line-height: 1.45; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.how p { margin: 0; max-width: 84ch; }
+.how .r { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.opts { display: flex; gap: 14px; flex-wrap: wrap; padding: 6px 12px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 0.85rem; }
+.opts label { display: flex; gap: 6px; align-items: center; }
+.split { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+.dump { margin: 0; padding: 12px 14px; max-height: 360px; overflow: auto; font-size: 12.5px; line-height: 1.5; color: #d9f7cf; white-space: pre; }
+.split .notes { border-bottom: 0; border-left: 1px solid var(--line); align-content: start; }
+
+.sheet { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); display: grid; place-items: center; z-index: 20;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.sheet .box { width: min(640px, 100%); border: 2px solid var(--green); background: var(--surface); box-shadow: 6px 6px 0 var(--pink); max-height: 90vh; display: flex; flex-direction: column; }
+.sheet textarea { width: 100%; height: 220px; background: #000; border: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 10px; font-size: 12.5px; resize: vertical; }
+.sheet .foot { display: flex; gap: 8px; justify-content: flex-end; padding: 10px; flex-wrap: wrap; align-items: center; }
+.sheet .foot span { margin-right: auto; color: var(--muted); font-size: 0.85rem; }
+.toast { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--green); color: #000;
+  font-family: var(--font-title); font-size: 1.1rem; letter-spacing: 0.06em; padding: 6px 14px 4px; text-transform: uppercase; box-shadow: 4px 4px 0 var(--pink); z-index: 30; max-width: calc(100% - 32px); }
+
+@media (max-width: 960px) {
+  .desk { grid-template-columns: minmax(0, 1fr); }
+  .editor, .nodes { min-height: 420px; }
+  .row { grid-template-columns: 7rem minmax(0, 1fr) 3.2rem 1.8rem; }
+  .split { grid-template-columns: minmax(0, 1fr); }
+  .split .notes { border-left: 0; border-top: 1px solid var(--line); }
+}
+@media (prefers-reduced-motion: reduce) { .btn, .btn:hover { transition: none; transform: none; } }
+</style>
+
+<div class="app">
+  <header class="bar">
+    <h1 class="logo">INOSCULA<span>_</span></h1>
+    <div class="sub">Build a shader once. Open it in Blender, Godot, Unreal, Unity and RICO Engine, still editable, still the same.</div>
+    <div class="grow"></div>
+    <div class="tools">
+      <select id="look" class="btn" aria-label="Start from a look"></select>
+      <button id="openBtn" class="btn ghost" type="button">Open</button>
+      <button id="saveSrcBtn" class="btn ghost" type="button">Save</button>
+      <button id="importBtn" class="btn ghost" type="button">Import graph</button>
+      <button id="liveBtn" class="btn ghost" type="button" aria-pressed="false">Live link</button>
+      <span id="livePill" class="pill">Offline</span>
+    </div>
+  </header>
+
+  <div class="desk">
+    <section class="frame live" aria-label="Shader">
+      <div class="head"><span class="chips" role="tablist"><button class="chip on" id="viewCode" type="button">Code</button><button class="chip" id="viewNodes" type="button">Nodes</button></span>
+        <span class="r"><span id="fileName">untitled.inoscula</span><button id="refBtn" class="chip" type="button">Reference</button></span></div>
+      <div class="editor" id="editorBox">
+        <div class="gutter" id="gutter" aria-hidden="true"></div>
+        <div class="code">
+          <pre id="hl" aria-hidden="true"></pre>
+          <textarea id="src" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Inoscula shader code"></textarea>
+        </div>
+      </div>
+      <div class="nodes" id="nodesBox" hidden aria-label="Node graph"></div>
+      <div id="status" class="status">Compiling&hellip;</div>
+    </section>
+
+    <section class="frame" aria-label="Live preview">
+      <div class="head"><span><b>Preview</b></span>
+        <span class="r chips" id="shapes"></span></div>
+      <div class="lightbar">
+        <label for="profile">Looks like</label>
+        <select id="profile" class="chip">
+          <option value="rico">RICO Engine</option>
+          <option value="blender">Blender (AgX)</option>
+          <option value="unreal">Unreal (filmic)</option>
+          <option value="godot">Godot (linear)</option>
+          <option value="unity">Unity URP</option>
+        </select>
+        <label for="envSel">Light</label>
+        <select id="envSel" class="chip">
+          <option value="studio">Studio softboxes</option>
+          <option value="outdoor">Sun and sky</option>
+          <option value="night">Night interior</option>
+        </select>
+        <button id="lightBtn" class="chip" type="button" aria-pressed="false">Move light</button>
+        <button id="groundBtn" class="chip on" type="button" aria-pressed="true">Floor</button>
+      </div>
+      <div class="view" id="view"><canvas id="gl"></canvas><div class="hint" id="hint">Drag to turn the object.</div><div class="busy" id="busy" hidden>Working&hellip;</div></div>
+      <div class="lightbar">
+        <button id="modelBtn" class="chip" type="button">Load model</button>
+        <button id="prepBtn" class="chip" type="button" disabled>Prepare model</button>
+        <button id="cardsBtn" class="chip" type="button" aria-pressed="false" title="Lay single brush strokes over the model, lifted off the surface so they break the silhouette">Brush cards</button>
+        <button id="saveModelBtn" class="chip" type="button" disabled>Save model</button>
+        <span id="modelInfo">Bring a .glb, .gltf or .obj. Prepare model stores curvature and occlusion for wear and grime.</span>
+        <input type="file" id="modelIn" accept=".glb,.gltf,.obj" hidden>
+      </div>
+      <div class="head"><span><b>Parameters</b></span>
+        <span class="r"><button id="playBtn" class="chip on" type="button">Playing</button><input type="range" id="scrub" min="0" max="10" step="0.01" value="0" aria-label="Time" style="width: 8rem"><span id="clock" style="font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right;">0.00s</span></span></div>
+      <div class="panel" id="params"></div>
+    </section>
+  </div>
+
+  <section class="frame out" aria-label="Exports">
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="opts" id="unrealOpts" hidden>
+      <label><input type="radio" name="ueAs" value="material" checked> Material</label>
+      <label><input type="radio" name="ueAs" value="function"> Material Function (to plug into your own materials and layers)</label>
+      <label><input type="checkbox" id="ueSub"> Substrate</label>
+    </div>
+    <div class="how"><p id="how"></p><span class="r"><button id="copyBtn" class="btn solid" type="button">Copy</button><button id="saveBtn" class="btn" type="button" hidden>Save file</button></span></div>
+    <div class="split"><pre class="dump" id="dump"></pre><div class="notes" id="notes" aria-label="How it travels"></div></div>
+  </section>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="head"><span id="sheetTitle"><b>Import a graph</b></span></div>
+    <div class="how"><p>Paste a <code>.inoscula.json</code>: the one the Blender importer writes (<code>blender_to_inoscula.py</code>), the one Unreal writes (<code>inoscula_from_unreal.py</code>), or one from Godot (<code>inoscula-pull</code>). It opens as code, with every change made in that program.</p></div>
+    <textarea id="pasteBox" spellcheck="false" aria-label="Graph JSON"></textarea>
+    <div class="foot"><span><input type="file" id="fileIn" accept=".json,.inoscula,application/json" aria-label="Open a file"></span>
+      <button class="btn ghost" id="sheetCancel" type="button">Cancel</button><button class="btn solid" id="sheetOk" type="button">Open</button></div>
+  </div>
+</div>
+<div class="sheet" id="refSheet" hidden>
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="refTitle" style="width: min(780px, 100%);">
+    <div class="head"><span id="refTitle"><b>Inoscula code reference</b></span><button class="chip" id="refClose" type="button">Close</button></div>
+    <pre class="dump" style="max-height: 74vh;">name "My Shader";
+shading "lit";                    leave out for unlit (the same colour everywhere)
+
+uniform float speed = 1.0;   // @range 0 4 @label Speed
+uniform vec3  tint = vec3(1.0, 0.4, 0.2); // @color @label Tint
+                                           parameters: sliders and colour pickers in every tool,
+                                           animatable there (keyframes, Sequencer, AnimationPlayer)
+
+float bands(float x, float n) {           your own functions; copied in where used
+  return floor(x * n) / n;
+}
+
+void main() {
+  float x = ...;  vec3 v = ...;            variables, reassign freely
+  color = ...;                              unlit: the final colour. lit: the base colour
+  alpha = ...;                              optional, 0 to 1
+  roughness = ...;  metallic = ...;         lit only
+  bump = ...;                               lit: height in metres (a few millimetres is plenty)
+  emission = ...;                           lit: glow, linear RGB
+  coat = ...;  coat_roughness = ...;        lit layers (clear coat)
+  sheen = ...;  sheen_color = ...;  sheen_roughness = ...;
+  subsurface = ...;
+}
+
+INPUTS        uv  object_pos  object_normal  world_pos  normal  view_dir  time
+              light_dir  light_color        the lighting contract
+              curvature  occlusion          shape data, from Prepare model
+CONSTANTS     PI  TAU
+MATHS         + - * /   sin cos abs floor fract exp sqrt pow min max clamp mix
+              smoothstep step saturate mod sign one_minus radians atan(y, x)
+VECTORS       vec3(x, y, z)  vec3(x)  v.x v.y v.z (or .r .g .b)  dot length
+              normalize distance reflect
+COMPARE       a &gt; b   a &lt; b   a &gt;= b   a &lt;= b    give 1.0 or 0.0
+PICK          condition ? a : b
+PATTERNS      noise(p, scale, detail, roughness, lacunarity)   Blender's Noise Texture
+              voronoi(p, scale, randomness)  distance; .color per cell; .position
+              hash(p)       a random 0..1 per point, Blender's White Noise
+              ramp(t, "constant" or "linear", 0.0, vec3(...), 0.5, vec3(...), ...)
+
+Not allowed: loops and if blocks. Node graphs cannot loop, so a shader with
+loops could not travel. Use mix, step, smoothstep or ?: instead.
+
+Stop motion: float frame = floor(time * 12.0);  then use frame in hash() or
+noise() so the surface changes 12 times a second, like a puppet between shots.</pre>
+  </div>
+</div>
+<input type="file" id="srcIn" accept=".inoscula,.txt,.json" hidden>
+<div class="toast" id="toast" hidden></div>
+
+<!--THREE_LOADER-->
+<script type="module">
+import * as THREE from 'three'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js'
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js'
+/*INOSCULA_BUNDLE*/
+const LOOKS = /*LOOKS*/;
+
+const $ = (id) => document.getElementById(id)
+const src = $('src'), hl = $('hl'), gutter = $('gutter'), status = $('status')
+const store = { get(k) { try { return localStorage.getItem(k) } catch { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch {} } }
+
+// ------------------------------------------------------------- editor
+const KW = new Set(['void', 'main', 'uniform', 'name', 'shading', 'return', 'if', 'for', 'while'])
+const TY = new Set(['float', 'vec3'])
+const IN = new Set(['uv', 'object_pos', 'object_normal', 'world_pos', 'normal', 'view_dir', 'time', 'light_dir', 'light_color', 'curvature', 'occlusion', 'PI', 'TAU'])
+const OUT_NAMES = new Set(['color', 'alpha', 'roughness', 'metallic', 'bump', 'emission', 'coat', 'coat_roughness', 'sheen', 'sheen_color', 'sheen_roughness', 'subsurface'])
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+function highlight(text) {
+  return text.replace(/(\/\/[^\n]*)|("[^"\n]*")|(\b\d+\.?\d*(?:e[+-]?\d+)?\b|\.\d+)|([A-Za-z_][A-Za-z0-9_]*)(\s*\()?|([&<>])/g, (m, com, str, num, id, call, ch) => {
+    if (com) return `<span class="t-com">${esc(com)}</span>`
+    if (str) return `<span class="t-str">${esc(str)}</span>`
+    if (num) return `<span class="t-num">${num}</span>`
+    if (id) {
+      const cls = KW.has(id) ? 't-kw' : TY.has(id) ? 't-ty' : IN.has(id) ? 't-in' : OUT_NAMES.has(id) ? 't-out' : call ? 't-fn' : ''
+      return (cls ? `<span class="${cls}">${id}</span>` : id) + (call ?? '')
+    }
+    return esc(ch)
+  }) + '\n'
+}
+let badLine = 0, pickLine = 0
+function paint() {
+  hl.innerHTML = highlight(src.value)
+  const n = src.value.split('\n').length
+  let g = ''
+  for (let i = 1; i <= n; i++) g += `<div${i === badLine ? ' class="bad"' : i === pickLine ? ' class="pick"' : ''}>${i}</div>`
+  gutter.innerHTML = g
+  syncScroll()
+}
+function syncScroll() { hl.scrollTop = src.scrollTop; hl.scrollLeft = src.scrollLeft; gutter.scrollTop = src.scrollTop }
+src.addEventListener('scroll', syncScroll)
+src.addEventListener('keydown', (e) => {
+  if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); document.execCommand('insertText', false, '  ') }
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveSource() }
+})
+let timer = 0
+src.addEventListener('input', () => { pickLine = 0; paint(); clearTimeout(timer); timer = setTimeout(compile, 220); store.set('inoscula-draft', src.value) })
+function goToLine(n) {
+  const lines = src.value.split('\n')
+  let pos = 0
+  for (let i = 0; i < n - 1; i++) pos += lines[i].length + 1
+  showView('code')
+  src.focus(); src.setSelectionRange(pos, pos + (lines[n - 1]?.length ?? 0))
+  src.scrollTop = Math.max(0, (n - 6) * 20)
+  pickLine = n; paint()
+}
+
+// ------------------------------------------------------------- 3D preview
+const canvas = $('gl'), view = $('view')
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true })
+renderer.shadowMap.enabled = true
+renderer.shadowMap.type = THREE.PCFSoftShadowMap
+const scene = new THREE.Scene()
+const cam = new THREE.PerspectiveCamera(32, 4 / 3, 0.05, 200)
+cam.position.set(0, 0.25, 6.6)
+cam.lookAt(0, 0, 0)
+const sun = new THREE.DirectionalLight(0xffffff, 2.2)
+sun.castShadow = true
+sun.shadow.mapSize.set(2048, 2048)
+sun.shadow.camera.left = sun.shadow.camera.bottom = -3; sun.shadow.camera.right = sun.shadow.camera.top = 3
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02
+scene.add(sun, sun.target)
+let lightYaw = -0.7, lightPitch = 0.75
+const holder = new THREE.Group(); scene.add(holder)
+holder.rotation.set(0.25, 0.5, 0)
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ opacity: 0.45 }))
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground)
+
+// lighting environments, made here so nothing is downloaded: a sky dome with soft panels, filtered for reflections
+const pmrem = new THREE.PMREMGenerator(renderer)
+function envScene(kind) {
+  const s = new THREE.Scene()
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(50, 64, 32), new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: { top: { value: new THREE.Color() }, mid: { value: new THREE.Color() }, bot: { value: new THREE.Color() } },
+    vertexShader: 'varying vec3 d; void main(){ d = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: 'uniform vec3 top, mid, bot; varying vec3 d; void main(){ float y = d.y; vec3 c = y > 0.0 ? mix(mid, top, pow(y, 0.6)) : mix(mid, bot, pow(-y, 0.4)); gl_FragColor = vec4(c, 1.0); }',
+  }))
+  s.add(sky)
+  const panel = (w, h, pos, intensity, color = 0xffffff) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), side: THREE.DoubleSide }))
+    m.position.copy(pos); m.lookAt(0, 0, 0); s.add(m)
+  }
+  const u = sky.material.uniforms
+  if (kind === 'studio') {
+    u.top.value.setRGB(0.12, 0.12, 0.13); u.mid.value.setRGB(0.05, 0.05, 0.055); u.bot.value.setRGB(0.02, 0.02, 0.02)
+    panel(14, 8, new THREE.Vector3(-14, 10, 12), 6); panel(10, 10, new THREE.Vector3(16, 6, 6), 3.5); panel(20, 4, new THREE.Vector3(0, 14, -18), 4); panel(8, 8, new THREE.Vector3(0, 20, 0), 2.5)
+  } else if (kind === 'outdoor') {
+    u.top.value.setRGB(0.18, 0.36, 0.85); u.mid.value.setRGB(0.75, 0.82, 0.92); u.bot.value.setRGB(0.22, 0.2, 0.17)
+    panel(4, 4, new THREE.Vector3(-20, 26, 18), 60, 0xfff1d6)
+  } else {
+    u.top.value.setRGB(0.01, 0.012, 0.03); u.mid.value.setRGB(0.008, 0.01, 0.02); u.bot.value.setRGB(0.003, 0.003, 0.004)
+    panel(3, 6, new THREE.Vector3(-12, 4, 10), 8, 0xffb36b); panel(14, 1.2, new THREE.Vector3(14, 3, -6), 6, 0x6b8cff)
+  }
+  return s
+}
+const envs = {}
+function setEnv(kind) {
+  envs[kind] = envs[kind] ?? pmrem.fromScene(envScene(kind), 0.03).texture
+  scene.environment = envs[kind]
+  scene.background = new THREE.Color(kind === 'outdoor' ? 0x0b0f14 : 0x000000)
+  sun.intensity = kind === 'outdoor' ? 3.2 : kind === 'night' ? 0.7 : 2.2
+  sun.color.set(kind === 'night' ? 0xffc38a : 0xffffff)
+  scene.environmentIntensity = kind === 'night' ? 0.6 : 1.0
+}
+const PROFILES = {
+  rico: { tone: THREE.AgXToneMapping, exposure: 1.0, note: 'RICO Engine: lit materials with AgX tonemapping; unlit colours shown exactly as written.' },
+  blender: { tone: THREE.AgXToneMapping, exposure: 1.0, note: 'Blender 4 and later: AgX view transform, the default.' },
+  unreal: { tone: THREE.ACESFilmicToneMapping, exposure: 1.25, note: 'Unreal: a filmic tonemapper and auto exposure. Lumen bounce light is not simulated here.' },
+  godot: { tone: THREE.LinearToneMapping, exposure: 1.0, note: 'Godot 4: Linear tonemapping, the default for a new Environment.' },
+  unity: { tone: THREE.NeutralToneMapping, exposure: 1.0, note: 'Unity URP with a post process volume using Neutral tonemapping.' },
+}
+function setProfile(k) {
+  const p = PROFILES[k]
+  renderer.toneMapping = p.tone; renderer.toneMappingExposure = p.exposure
+  profileKey = k
+  unlitToneMap()
+  holder.traverse((o) => { if (o.material) o.material.needsUpdate = true })
+  renderNotes()
+}
+let profileKey = 'rico'
+
+function puppet() {
+  const g = new THREE.Group()
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.62, 0.7, 24, 64)); body.position.y = -0.55
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.7, 96, 48)); head.position.y = 0.75
+  const ear1 = new THREE.Mesh(new THREE.SphereGeometry(0.22, 48, 24)); ear1.position.set(-0.55, 1.25, 0)
+  const ear2 = ear1.clone(); ear2.position.x = 0.55
+  g.add(body, head, ear1, ear2)
+  g.scale.setScalar(0.8)
+  return g
+}
+function roundedBox() {
+  const g = new THREE.BoxGeometry(1.8, 1.8, 1.8, 24, 24, 24)
+  const p = g.attributes.position, v = new THREE.Vector3(), r = 0.18
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i)
+    const c = new THREE.Vector3(Math.max(-0.9 + r, Math.min(0.9 - r, v.x)), Math.max(-0.9 + r, Math.min(0.9 - r, v.y)), Math.max(-0.9 + r, Math.min(0.9 - r, v.z)))
+    v.sub(c).normalize().multiplyScalar(r).add(c); p.setXYZ(i, v.x, v.y, v.z)
+  }
+  g.computeVertexNormals()
+  return new THREE.Mesh(g)
+}
+const SHAPES = {
+  Sphere: () => new THREE.Mesh(new THREE.SphereGeometry(1.35, 160, 80)),
+  Knot: () => new THREE.Mesh(new THREE.TorusKnotGeometry(0.9, 0.36, 320, 56)),
+  Puppet: puppet,
+  Box: roundedBox,
+}
+let shapeName = 'Sphere', shape = null, material = null, userModel = null, userName = ''
+const shapeCache = {}
+function placeOnFloor(obj) {
+  const box = new THREE.Box3().setFromObject(obj)
+  ground.position.y = box.min.y - 0.001
+  sun.target.position.set(0, 0, 0)
+}
+function setShape(n) {
+  shapeName = n
+  if (shape) holder.remove(shape)
+  shape = n === 'Model' ? userModel : (shapeCache[n] ??= SHAPES[n]())
+  shape.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
+  holder.add(shape)
+  applyMaterial()
+  for (const b of $('shapes').children) b.classList.toggle('on', b.dataset.s === n)
+  requestAnimationFrame(() => placeOnFloor(holder))
+  autoPrepare()
+  syncCards()
+}
+function shapeButtons() {
+  $('shapes').innerHTML = ''
+  for (const n of [...Object.keys(SHAPES), ...(userModel ? ['Model'] : [])]) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = n === 'Model' ? userName.slice(0, 14) : n; b.dataset.s = n
+    b.addEventListener('click', () => setShape(n)); $('shapes').append(b)
+  }
+}
+shapeButtons()
+let outlineMat = null
+function applyMaterial() {
+  if (!shape || !material) return
+  const old = []
+  shape.traverse((o) => { if (o.userData.inosculaOutline) old.push(o) })
+  for (const o of old) o.parent.remove(o)
+  const meshes = []
+  shape.traverse((o) => { if (o.isMesh && !o.userData.inosculaOutline) meshes.push(o) })
+  // object_size: the whole model's size, so looks keep the same stroke count on any object
+  const sizeNow = () => { const v = new THREE.Box3().setFromObject(shape).getSize(new THREE.Vector3()).length(); return v || 2 }
+  let osize = sizeNow()
+  for (const o of meshes) {
+    o.material = material
+    o.onBeforeRender = () => { if (uniforms?.inoscula_object_size) { uniforms.inoscula_object_size.value = osize; material.uniformsNeedUpdate = true } }
+    if (outlineMat && !o.userData.inosculaCards && !o.userData.inosculaShells) { const e = new THREE.Mesh(o.geometry, outlineMat); e.userData.inosculaOutline = true; o.add(e) }
+  }
+}
+
+let quality = 1, frameAvg = 16, sinceChange = 0 // render resolution scale, adapted to frame time below
+function resize() {
+  const w = view.clientWidth, h = view.clientHeight
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1) * quality)
+  renderer.setSize(w, h, false)
+  cam.aspect = w / h; cam.updateProjectionMatrix()
+}
+new ResizeObserver(resize).observe(view)
+
+let drag = null, lightMode = false
+$('lightBtn').addEventListener('click', () => { lightMode = !lightMode; $('lightBtn').classList.toggle('on', lightMode); $('lightBtn').setAttribute('aria-pressed', lightMode); $('hint').textContent = lightMode ? 'Drag to move the light.' : 'Drag to turn the object. Scroll to zoom.' })
+$('groundBtn').addEventListener('click', () => { ground.visible = !ground.visible; $('groundBtn').classList.toggle('on', ground.visible); $('groundBtn').setAttribute('aria-pressed', ground.visible) })
+view.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, light: lightMode || e.shiftKey }; view.setPointerCapture(e.pointerId); view.style.cursor = 'grabbing' })
+view.addEventListener('pointermove', (e) => {
+  if (!drag) return
+  const dx = (e.clientX - drag.x) / 160, dy = (e.clientY - drag.y) / 160
+  drag.x = e.clientX; drag.y = e.clientY
+  if (drag.light) { lightYaw += dx * 1.5; lightPitch = Math.max(-0.2, Math.min(1.45, lightPitch - dy * 1.5)) }
+  else { holder.rotation.y += dx; holder.rotation.x = Math.max(-1.4, Math.min(1.4, holder.rotation.x + dy)); placeOnFloor(holder) }
+})
+const endDrag = () => { drag = null; view.style.cursor = '' }
+view.addEventListener('pointerup', endDrag); view.addEventListener('pointercancel', endDrag)
+view.addEventListener('wheel', (e) => { e.preventDefault(); cam.position.multiplyScalar(e.deltaY > 0 ? 1.08 : 1 / 1.08); cam.position.clampLength(1.5, 30) }, { passive: false })
+
+// ------------------------------------------------------------- your own model
+const busy = (on, text = 'Working…') => { $('busy').hidden = !on; $('busy').textContent = text }
+$('modelBtn').addEventListener('click', () => $('modelIn').click())
+$('modelIn').addEventListener('change', async () => { const f = $('modelIn').files?.[0]; if (f) await loadModel(f); $('modelIn').value = '' })
+view.addEventListener('dragover', (e) => e.preventDefault())
+view.addEventListener('drop', async (e) => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) await loadModel(f) })
+async function loadModel(file) {
+  busy(true, 'Loading model…')
+  try {
+    let root
+    if (/\.obj$/i.test(file.name)) root = new OBJLoader().parse(await file.text())
+    else root = (await new GLTFLoader().parseAsync(await file.arrayBuffer(), '')).scene
+    // fit it to the stage: centred, about 2.6 units tall
+    root.updateMatrixWorld(true)
+    const box = new THREE.Box3().setFromObject(root), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3())
+    const k = 2.6 / Math.max(size.x, size.y, size.z)
+    const wrap = new THREE.Group(); root.position.sub(c); wrap.add(root); wrap.scale.setScalar(k)
+    let tris = 0, hasShape = true
+    root.traverse((o) => { if (o.isMesh) { tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; if (!o.geometry.attributes.color) hasShape = false; if (!o.geometry.attributes.uv) { const n = o.geometry.attributes.position.count; o.geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2)) } } })
+    userModel = wrap; userName = file.name
+    shapeButtons(); setShape('Model')
+    $('prepBtn').disabled = false; $('saveModelBtn').disabled = !hasShape
+    $('modelInfo').textContent = `${file.name}: ${Math.round(tris).toLocaleString()} triangles. ${hasShape ? 'Has vertex colours (shape data).' : 'No shape data yet: press Prepare model.'}`
+  } catch (e) { toast('Could not read that model'); console.warn(e) }
+  busy(false)
+}
+
+// Prepare model: curvature (how convex each point is) and occlusion (how open it is), stored as vertex colours
+async function prepare(root) {
+  busy(true, 'Measuring curvature and occlusion…')
+  await new Promise((r) => setTimeout(r, 30))
+  const meshes = []
+  root.traverse((o) => { if (o.isMesh) meshes.push(o) })
+  root.updateMatrixWorld(true)
+  for (const m of meshes) {
+    if (!m.geometry.attributes.normal) m.geometry.computeVertexNormals()
+    m.geometry.setAttribute('color', new THREE.BufferAttribute(curvatureOf(m.geometry), 3))
+  }
+  await occlusionOf(meshes, root)
+  root.userData.prepared = true
+  buildMaterial()
+  busy(false)
+}
+$('prepBtn').addEventListener('click', async () => {
+  if (!userModel) return
+  await prepare(userModel)
+  $('saveModelBtn').disabled = false
+  $('modelInfo').textContent = `${userName}: shape data stored (red curvature, green occlusion, blue 0.5 as the marker). Save model to take it to Blender, Godot, Unreal or Unity.`
+})
+// the built-in shapes get their shape data automatically when a shader reads it
+async function autoPrepare() {
+  if (!ir || !shape || shape === userModel || shape.userData.prepared) return
+  if (!(ir.uses.has('curvature') || ir.uses.has('occlusion'))) return
+  await prepare(shape)
+}
+function curvatureOf(geo) {
+  // weld by position, then compare each vertex's normal with its neighbours' along every edge
+  const pos = geo.attributes.position, nrm = geo.attributes.normal, n = pos.count
+  const welded = mergeVertices(geo.clone().deleteAttribute('uv').deleteAttribute('color') ?? geo, 1e-4)
+  const wp = welded.attributes.position, idx = welded.index
+  if (!welded.attributes.normal) welded.computeVertexNormals()
+  welded.computeVertexNormals()
+  const wn = welded.attributes.normal, k = new Float32Array(wp.count), c = new Float32Array(wp.count)
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), na = new THREE.Vector3(), nb = new THREE.Vector3()
+  const edge = (i, j) => {
+    a.fromBufferAttribute(wp, i); b.fromBufferAttribute(wp, j); na.fromBufferAttribute(wn, i); nb.fromBufferAttribute(wn, j)
+    const d = a.clone().sub(b), l2 = d.lengthSq()
+    if (l2 < 1e-12) return
+    const v = na.clone().sub(nb).dot(d) / Math.sqrt(l2)
+    k[i] += v; k[j] += v; c[i]++; c[j]++
+  }
+  for (let t = 0; t < idx.count; t += 3) { const i = idx.getX(t), j = idx.getX(t + 1), l = idx.getX(t + 2); edge(i, j); edge(j, l); edge(l, i) }
+  for (let i = 0; i < k.length; i++) k[i] = c[i] ? k[i] / c[i] : 0
+  const sorted = Array.from(k, Math.abs).sort((x, y) => x - y), s = sorted[Math.floor(sorted.length * 0.97)] || 1
+  // map back to the original vertices by position
+  const key = (x, y, z) => `${Math.round(x * 1e4)},${Math.round(y * 1e4)},${Math.round(z * 1e4)}`
+  const map = new Map()
+  for (let i = 0; i < wp.count; i++) map.set(key(wp.getX(i), wp.getY(i), wp.getZ(i)), i)
+  const out = new Float32Array(n * 3)
+  for (let i = 0; i < n; i++) {
+    const w = map.get(key(pos.getX(i), pos.getY(i), pos.getZ(i)))
+    out[i * 3] = 0.5 + 0.5 * Math.max(-1, Math.min(1, (w === undefined ? 0 : k[w]) / s))
+    out[i * 3 + 1] = 1; out[i * 3 + 2] = 0.5 // blue 0.5 marks Inoscula shape data
+  }
+  return out
+}
+async function occlusionOf(meshes, root) {
+  // look at the model from 96 directions; a vertex is open towards a direction if nothing is in front of it there
+  const DIRS = 96, RES = 512
+  const box = new THREE.Box3().setFromObject(root), sphere = box.getBoundingSphere(new THREE.Sphere())
+  const depthMat = new THREE.ShaderMaterial({ side: THREE.DoubleSide, vertexShader: 'varying float z; void main(){ vec4 v = modelViewMatrix * vec4(position, 1.0); z = -v.z; gl_Position = projectionMatrix * v; }', fragmentShader: 'varying float z; void main(){ gl_FragColor = vec4(z, 0.0, 0.0, 1.0); }' })
+  const rt = new THREE.WebGLRenderTarget(RES, RES, { type: THREE.FloatType })
+  const s2 = new THREE.Scene()
+  const proxies = meshes.map((m) => { const p = new THREE.Mesh(m.geometry, depthMat); p.matrixAutoUpdate = false; p.matrix.copy(m.matrixWorld); s2.add(p); return p })
+  const R = sphere.radius * 1.05, ortho = new THREE.OrthographicCamera(-R, R, R, -R, 0.01, R * 4)
+  const buf = new Float32Array(RES * RES * 4)
+  const acc = meshes.map((m) => ({ vis: new Float32Array(m.geometry.attributes.position.count), tot: new Float32Array(m.geometry.attributes.position.count) }))
+  const v = new THREE.Vector3(), nn = new THREE.Vector3(), dir = new THREE.Vector3(), nm = new THREE.Matrix3()
+  for (let d = 0; d < DIRS; d++) {
+    const y = 1 - (2 * (d + 0.5)) / DIRS, r = Math.sqrt(1 - y * y), th = d * 2.39996323
+    dir.set(Math.cos(th) * r, y, Math.sin(th) * r)
+    ortho.position.copy(sphere.center).addScaledVector(dir, R * 2); ortho.lookAt(sphere.center); ortho.updateMatrixWorld(); ortho.updateProjectionMatrix()
+    renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(s2, ortho)
+    renderer.readRenderTargetPixels(rt, 0, 0, RES, RES, buf)
+    meshes.forEach((m, mi) => {
+      const pos = m.geometry.attributes.position, nrm = m.geometry.attributes.normal
+      nm.getNormalMatrix(m.matrixWorld)
+      for (let i = 0; i < pos.count; i++) {
+        nn.fromBufferAttribute(nrm, i).applyMatrix3(nm).normalize()
+        const w = nn.dot(dir)
+        if (w <= 0) continue
+        v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld)
+        const depth = v.clone().applyMatrix4(ortho.matrixWorldInverse)
+        const ndc = v.clone().project(ortho)
+        const px = Math.floor((ndc.x * 0.5 + 0.5) * RES), py = Math.floor((ndc.y * 0.5 + 0.5) * RES)
+        acc[mi].tot[i] += w
+        if (px < 0 || py < 0 || px >= RES || py >= RES) { acc[mi].vis[i] += w; continue }
+        const front = buf[(py * RES + px) * 4]
+        if (-depth.z <= front + R * 0.01 || front === 0) acc[mi].vis[i] += w
+      }
+    })
+    if (d % 12 === 11) await new Promise((res) => setTimeout(res, 0))
+  }
+  renderer.setRenderTarget(null)
+  meshes.forEach((m, mi) => {
+    const col = m.geometry.attributes.color
+    for (let i = 0; i < col.count; i++) col.setY(i, acc[mi].tot[i] ? Math.pow(acc[mi].vis[i] / acc[mi].tot[i], 1.4) : 1)
+    col.needsUpdate = true
+  })
+  rt.dispose()
+}
+$('saveModelBtn').addEventListener('click', async () => {
+  if (!userModel) return
+  const clone = userModel.clone(true)
+  const drop = []
+  clone.traverse((o) => { if (o.userData.inosculaOutline) drop.push(o); else if (o.isMesh) o.material = new THREE.MeshStandardMaterial({ vertexColors: Boolean(o.geometry.attributes.color), name: o.userData.inosculaCards ? 'Brush Cards' : o.userData.inosculaShells ? 'Rim And Outlines' : undefined }) })
+  for (const o of drop) o.parent.remove(o)
+  const data = await new GLTFExporter().parseAsync(clone, { binary: true })
+  saveFile(new Blob([data], { type: 'model/gltf-binary' }), userName.replace(/\.\w+$/, '') + '.inoscula.glb')
+})
+
+// ------------------------------------------------------------- brush cards
+// Single strokes laid over the model, lifted off the surface so they overlap and break the silhouette. Looks
+// that are made for them ask for them (cards count, length, width;), and the button turns them on or off.
+let cardsChoice = null
+const cardCache = new Map()
+function cardsOn() { return cardsChoice ?? Boolean(graph?.cards) }
+function syncCards() {
+  if (!shape) return
+  const old = []
+  shape.traverse((o) => { if (o.userData.inosculaCards || o.userData.inosculaShells) old.push(o) })
+  for (const o of old) o.parent.remove(o)
+  // a look made for an outer rim and offset outlines gets them: inflated copies drawn with the same material
+  if (graph?.shells) {
+    const bodies = []
+    shape.traverse((o) => { if (o.isMesh && !o.userData.inosculaOutline && !o.userData.inosculaCards && !o.userData.inosculaShells) bodies.push(o) })
+    for (const [mi, m] of bodies.entries()) {
+      const g = m.geometry
+      if (!g.attributes.normal) g.computeVertexNormals()
+      const key = 'shell' + g.uuid + JSON.stringify(graph.shells) + mi
+      let sg = cardCache.get(key)
+      if (!sg) {
+        const k = paintShells(g.attributes.position.array, g.attributes.normal.array, g.index ? g.index.array : null, { ...graph.shells, seed: 11 + mi })
+        sg = new THREE.BufferGeometry()
+        sg.setAttribute('position', new THREE.BufferAttribute(k.positions, 3)); sg.setAttribute('normal', new THREE.BufferAttribute(k.normals, 3))
+        sg.setAttribute('uv', new THREE.BufferAttribute(k.uvs, 2)); sg.setIndex(new THREE.BufferAttribute(k.indices, 1))
+        const n = k.positions.length / 3, col = new Float32Array(n * 3).fill(0.5); for (let i = 1; i < col.length; i += 3) col[i] = 1
+        sg.setAttribute('color', new THREE.BufferAttribute(col, 3))
+        cardCache.set(key, sg)
+      }
+      const c = new THREE.Mesh(sg, material); c.userData.inosculaShells = true; c.onBeforeRender = m.onBeforeRender; m.add(c)
+    }
+    if (shape === userModel) $('saveModelBtn').disabled = false
+  }
+  const on = cardsOn()
+  $('cardsBtn').classList.toggle('on', on); $('cardsBtn').setAttribute('aria-pressed', on)
+  if (!on) return
+  const opts = { count: 2400, length: 0.07, width: 0.32, ...graph?.cards }
+  const meshes = []
+  shape.traverse((o) => { if (o.isMesh && !o.userData.inosculaOutline && !o.userData.inosculaCards) meshes.push(o) })
+  // share the strokes between the model's parts by surface area (in the model's space), and keep each stroke
+  // the same size in every part
+  shape.updateMatrixWorld(true)
+  const scaleOf = (m) => m.matrixWorld.getMaxScaleOnAxis() / shape.matrixWorld.getMaxScaleOnAxis()
+  const areas = meshes.map((m) => meshArea(m.geometry.attributes.position.array, m.geometry.index ? m.geometry.index.array : null, scaleOf(m)))
+  const total = areas.reduce((x, y) => x + y, 0) || 1
+  const box = new THREE.Box3().setFromObject(shape), whole = box.getSize(new THREE.Vector3()).length() / shape.matrixWorld.getMaxScaleOnAxis()
+  for (const [mi, m] of meshes.entries()) {
+    const g = m.geometry
+    if (!g.attributes.normal) g.computeVertexNormals()
+    g.computeBoundingBox()
+    const own = g.boundingBox.getSize(new THREE.Vector3()).length() * scaleOf(m) || 1
+    const mo = { ...opts, count: Math.max(1, Math.round(opts.count * areas[mi] / total)), length: opts.length * whole / own, seed: 7 + mi }
+    const key = g.uuid + JSON.stringify(mo)
+    let cg = cardCache.get(key)
+    if (!cg) {
+      const k = brushCards(g.attributes.position.array, g.attributes.normal.array, g.index ? g.index.array : null, mo)
+      cg = new THREE.BufferGeometry()
+      cg.setAttribute('position', new THREE.BufferAttribute(k.positions, 3)); cg.setAttribute('normal', new THREE.BufferAttribute(k.normals, 3))
+      cg.setAttribute('uv', new THREE.BufferAttribute(k.uvs, 2)); cg.setIndex(new THREE.BufferAttribute(k.indices, 1))
+      const n = k.positions.length / 3, col = new Float32Array(n * 3).fill(0.5); for (let i = 1; i < col.length; i += 3) col[i] = 1
+      cg.setAttribute('color', new THREE.BufferAttribute(col, 3)) // neutral shape data: open, not on an edge
+      cardCache.set(key, cg)
+    }
+    const c = new THREE.Mesh(cg, material); c.userData.inosculaCards = true; c.castShadow = true
+    m.add(c)
+  }
+  if (shape === userModel) $('saveModelBtn').disabled = false
+}
+$('cardsBtn').addEventListener('click', () => {
+  cardsChoice = !cardsOn(); syncCards()
+  if (cardsOn() && !graph?.cards) toast('Brush cards are drawn with this shader. Looks made for them (Oil Strokes) draw a stroke on each card.')
+})
+
+// ------------------------------------------------------------- compile
+let graph = null, ir = null, values = {}, uniforms = null, lfo = {}
+const tabsSpec = [
+  ['Blender', 'blender.py', () => toBlender(ir), 'Blender: Text Editor, open this file, Run Script. Real shader nodes inside the group "Inoscula ' + (ir?.name ?? '') + '", every parameter on the group, keyframable. To bring changes back: importers/blender_to_inoscula.py.', 'blender'],
+  ['Godot', 'gdshader', () => toGodot(ir), 'Godot: save as .gdshader and make a ShaderMaterial with it; every parameter is in the Inspector and can be animated with an AnimationPlayer. Bring changes back with: node bin/inoscula-pull.ts material.tres this.gdshader', 'godot'],
+  ['Unreal', 'unreal.py', () => toUnreal(ir, { as: document.querySelector('input[name=ueAs]:checked').value, substrate: $('ueSub').checked }), 'Unreal: Tools, Execute Python Script, this file (needs the Python Editor Script Plugin). Parameters live in Material Instances and Sequencer. Bring changes back: select the asset and run importers/inoscula_from_unreal.py.', 'unreal'],
+  ['Unity', 'unity.hlsl', () => toUnity(ir), 'Unity Shader Graph: add a Custom Function node, Type File, Source this file. The first lines list the inputs and outputs to wire.', 'unity'],
+  ['RICO', 'three.json', () => { const t = toThree(ir); return JSON.stringify({ name: ir.name, lit: t.lit, uniforms: t.uniforms, fragmentShader: t.fragmentShader }, null, 2) }, 'RICO Engine: load the .inoscula.json with inosculaMaterial(THREE, graph); route any parameter from MIDI, OSC or Twin Ctrl with look.set(name, value). Inoscula Live also sends /inoscula/<shader>/<parameter> as OSC.', 'rico'],
+  ['Outline', 'outline.txt', () => ir.outline ? `// ---- Godot: save as ${fileBase()}_outline.gdshader, set it as the material's Next Pass\n${toGodotOutline(ir)}\n// ---- Unity: save as ${fileBase()}_outline.shader, add it as a second material\n${toUnityOutline(ir)}` : 'This shader has no outline. Add one with, for example:\n\n  uniform float lineWidth = 0.01;  // @range 0 0.05 @label Outline Width\n  ...\n  outline = lineWidth;\n  outline_color = vec3(0.02);\n  outline_breakup = 0.3;   // 0 solid, up to 1 broken and inked', 'The outline is drawn outside the silhouette: the mesh again, inside out and pushed out along its normals, with noise breaking the line up. Blender and Unreal get it automatically from their tabs (a Solidify modifier, and an Overlay Material). Godot and Unity use the two small shaders here. RICO: look.addOutline(mesh).', 'rico'],
+  ['Graph', 'inoscula.json', () => JSON.stringify(graph, null, 2), 'The Inoscula graph: the open format every tool reads and every export carries inside it. Keep it with your project; it is the source of truth.', 'rico'],
+]
+let tab = 0
+const isTopLevel = window.self === window.top
+function compile() {
+  try {
+    const g = parse(src.value)
+    const nir = check(g)
+    graph = g; ir = nir; badLine = 0
+    const keep = values
+    values = {}
+    for (const p of ir.params) values[p.id] = keep[p.id] !== undefined && Array.isArray(keep[p.id]) === Array.isArray(p.default) ? keep[p.id] : p.default
+    buildMaterial()
+    buildParams()
+    autoPrepare()
+    syncCards()
+    status.className = 'status ok'
+    const lt = ir.lit ? 'lit by each tool\'s renderer' : 'unlit, the same colour everywhere'
+    status.innerHTML = `<b>Ready.</b> ${esc(ir.name)}: ${ir.steps.length} nodes, ${ir.params.length} parameter${ir.params.length === 1 ? '' : 's'}, ${lt}.`
+    showTab(tab)
+    if (!$('nodesBox').hidden) drawNodes()
+  } catch (e) {
+    const msg = String(e.message ?? e)
+    badLine = e.line ?? (/^Line (\d+)/.exec(msg)?.[1] | 0)
+    status.className = 'status err'
+    status.innerHTML = `<b>Cannot build this yet.</b> ${esc(msg)}`
+  }
+  paint()
+}
+function buildMaterial() {
+  const sh = toThree(ir)
+  uniforms = {}
+  for (const [k, v] of Object.entries(sh.uniforms)) uniforms[k] = { value: Array.isArray(v) ? new THREE.Vector3(...v) : v }
+  for (const p of ir.params) setUniform(p.id, values[p.id])
+  let m
+  if (sh.lit) {
+    m = new THREE.MeshPhysicalMaterial({ transparent: Boolean(ir.alpha) && !ir.cutout, vertexColors: sh.vertexColors })
+    if (ir.cutout) { m.alphaTest = 0.5; m.side = THREE.DoubleSide }
+    m.defines = { USE_UV: '' }
+    if (ir.layers.coat) m.clearcoat = 1
+    if (ir.layers.sheen) m.sheen = 1
+    m.onBeforeCompile = (s) => { Object.assign(s.uniforms, uniforms); const p = sh.litPatch(s.vertexShader, s.fragmentShader); s.vertexShader = p.vertexShader; s.fragmentShader = p.fragmentShader }
+    const key = sh.fragmentShader + sh.vertexColors
+    m.customProgramCacheKey = () => key
+  } else {
+    m = new THREE.ShaderMaterial({ vertexShader: sh.vertexShader, fragmentShader: sh.fragmentShader, uniforms, transparent: Boolean(ir.alpha) && !ir.cutout, side: ir.cutout ? THREE.DoubleSide : THREE.FrontSide, vertexColors: sh.vertexColors })
+  }
+  material?.dispose(); material = m; unlitToneMap()
+  outlineMat?.dispose(); outlineMat = null
+  if (sh.outline) {
+    const ou = {}
+    for (const [k, from] of Object.entries(sh.outline.uniforms)) ou[k] = uniforms[from]
+    outlineMat = new THREE.ShaderMaterial({ vertexShader: sh.outline.vertexShader, fragmentShader: sh.outline.fragmentShader, uniforms: ou, side: THREE.BackSide, toneMapped: false })
+  }
+  applyMaterial()
+  compileInBackground()
+}
+// Big shaders (the painterly looks have hundreds of nodes) can take seconds to compile. Compile them in the
+// background (parallel shader compile where the browser has it) and keep the page responsive meanwhile: the
+// preview pauses with a note instead of freezing the whole page.
+let compiling = false, compileTicket = 0
+async function compileInBackground() {
+  const ticket = ++compileTicket
+  compiling = true; busy(true, 'Compiling shader…')
+  await new Promise((r) => setTimeout(r, 30))
+  try { await renderer.compileAsync(scene, cam) } catch (e) { console.warn(e) }
+  if (ticket !== compileTicket) return
+  compiling = false; busy(false)
+  frameAvg = 16
+}
+// unlit colours pass through the tonemapper only where that program does it by default (Blender, Unreal)
+function unlitToneMap() { if (material && !material.isMeshPhysicalMaterial) material.toneMapped = profileKey === 'blender' || profileKey === 'unreal' }
+function setUniform(id, v) {
+  const u = uniforms?.['p_' + id]
+  if (!u) return
+  if (Array.isArray(v)) u.value.set(v[0], v[1], v[2]); else u.value = v
+}
+
+const toS = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055)
+const toL = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4))
+const hex = (v) => '#' + v.map((c) => Math.round(Math.max(0, Math.min(1, toS(c))) * 255).toString(16).padStart(2, '0')).join('')
+const unhex = (h) => [1, 3, 5].map((i) => toL(parseInt(h.slice(i, i + 2), 16) / 255))
+
+const rows = {}
+function setParam(id, v, from) {
+  values[id] = v; setUniform(id, v)
+  const r = rows[id]
+  if (r) { if (Array.isArray(v)) { r.inp.value = hex(v); r.out.textContent = r.inp.value.slice(1).toUpperCase() } else { r.inp.value = v; r.out.textContent = (+v).toFixed(2) } }
+  if (from !== 'live') liveSend(id, v)
+}
+function buildParams() {
+  const box = $('params')
+  box.innerHTML = ''
+  for (const k in rows) delete rows[k]
+  const sect = (t) => { const d = document.createElement('div'); d.className = 'sect'; d.textContent = t; box.append(d) }
+  const colors = ir.params.filter((p) => p.type === 'color'), nums = ir.params.filter((p) => p.t === 'float'), vecs = ir.params.filter((p) => p.type === 'vector')
+  if (colors.length) sect('Colours')
+  for (const p of colors) {
+    const row = document.createElement('div'); row.className = 'row'
+    const id = 'p-' + p.id
+    row.innerHTML = `<label for="${id}">${esc(p.label ?? p.id)}</label><input type="color" id="${id}"><output></output><span></span>`
+    const inp = row.querySelector('input'), out = row.querySelector('output')
+    rows[p.id] = { inp, out }
+    inp.value = hex(values[p.id]); out.textContent = inp.value.slice(1).toUpperCase()
+    inp.addEventListener('input', () => setParam(p.id, unhex(inp.value)))
+    box.append(row)
+  }
+  if (nums.length) sect('Controls')
+  for (const p of nums) {
+    const row = document.createElement('div'); row.className = 'row'
+    const id = 'p-' + p.id
+    const lo = p.min ?? Math.min(0, p.default * 2), hi = p.max ?? Math.max(1, p.default * 2 || 1)
+    row.innerHTML = `<label for="${id}">${esc(p.label ?? p.id)}</label><input type="range" id="${id}" min="${lo}" max="${hi}" step="${(hi - lo) / 400}"><output></output><button type="button" class="lfo" title="Animate: swing this between its limits" aria-label="Animate ${esc(p.label ?? p.id)}">&#8767;</button>`
+    const inp = row.querySelector('input'), out = row.querySelector('output'), b = row.querySelector('.lfo')
+    rows[p.id] = { inp, out }
+    inp.value = values[p.id]; out.textContent = (+values[p.id]).toFixed(2)
+    inp.addEventListener('input', () => { delete lfo[p.id]; b.classList.remove('on'); setParam(p.id, +inp.value) })
+    if (lfo[p.id]) b.classList.add('on')
+    b.addEventListener('click', () => { if (lfo[p.id]) { delete lfo[p.id]; b.classList.remove('on') } else { lfo[p.id] = { lo, hi, t0: t }; b.classList.add('on') } })
+    box.append(row)
+  }
+  if (vecs.length) sect('Directions')
+  for (const p of vecs) {
+    for (const [k, axis] of ['x', 'y', 'z'].entries()) {
+      const row = document.createElement('div'); row.className = 'row'
+      const id = `p-${p.id}-${axis}`
+      row.innerHTML = `<label for="${id}">${esc(p.label ?? p.id)} ${axis}</label><input type="range" id="${id}" min="-1" max="1" step="0.005"><output></output><span></span>`
+      const inp = row.querySelector('input'), out = row.querySelector('output')
+      inp.value = values[p.id][k]; out.textContent = (+inp.value).toFixed(2)
+      inp.addEventListener('input', () => { const v = [...values[p.id]]; v[k] = +inp.value; out.textContent = (+inp.value).toFixed(2); setParam(p.id, v) })
+      box.append(row)
+    }
+  }
+  if (!ir.params.length) { const d = document.createElement('div'); d.className = 'sub'; d.textContent = 'No parameters yet. Add one with: uniform float speed = 1.0; // @range 0 4'; box.append(d) }
+}
+
+// ------------------------------------------------------------- node view
+function showView(v) {
+  $('editorBox').hidden = v !== 'code'; $('nodesBox').hidden = v !== 'nodes'
+  $('viewCode').classList.toggle('on', v === 'code'); $('viewNodes').classList.toggle('on', v === 'nodes')
+  if (v === 'nodes') drawNodes()
+}
+$('viewCode').addEventListener('click', () => showView('code'))
+$('viewNodes').addEventListener('click', () => showView('nodes'))
+function drawNodes() {
+  if (!ir) return
+  const lines = lineMap.get(graph) ?? new Map()
+  const byId = new Map(ir.steps.map((s) => [s.id, s]))
+  const depth = new Map(), W = 150, GAP = 46
+  const dOf = (s) => {
+    if (depth.has(s.id)) return depth.get(s.id)
+    let d = 0
+    for (const a of s.args) if (a.k === 'ref') { const base = a.id.replace(/_(x|y|z|color|position)$/, ''); const t = byId.get(base); if (t) d = Math.max(d, dOf(t) + 1) }
+    depth.set(s.id, d); return d
+  }
+  ir.steps.forEach(dOf)
+  const cols = []
+  for (const s of ir.steps) { const d = depth.get(s.id); (cols[d] ??= []).push(s) }
+  const pos = new Map(), outs = ['color', 'roughness', 'metallic', 'bump', 'emission', 'alpha']
+  const H = (s) => 30 + Math.max(1, s.args.length) * 14
+  let maxY = 0
+  cols.forEach((c, ci) => { let y = 16; for (const s of c) { pos.set(s.id, { x: 16 + ci * (W + GAP), y }); y += H(s) + 14 } maxY = Math.max(maxY, y) })
+  const outX = 16 + cols.length * (W + GAP)
+  const outList = [['color', ir.color], ['alpha', ir.alpha], ...(ir.lit ? [['roughness', ir.roughness], ['metallic', ir.metallic], ['bump', ir.bump], ['emission', ir.emission], ...Object.entries(ir.layers)] : [])].filter(([, a]) => a && a.k === 'ref')
+  const outH = 30 + outList.length * 14
+  const width = outX + W + 16, height = Math.max(maxY, outH + 32) + 16
+  const label = (s) => {
+    const nm = s.node.replace(/_\d+$/, '')
+    return s.op === 'param' ? s.set.id : s.op === 'value' ? 'value' : nm === s.op ? s.op : `${nm} · ${s.op}`
+  }
+  let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`
+  const wires = [], boxes = []
+  const portY = (s, i) => pos.get(s.id).y + 30 + i * 14 - 4
+  for (const s of ir.steps) {
+    const P = pos.get(s.id), src = OPS[s.op].source
+    s.args.forEach((a, i) => {
+      if (a.k !== 'ref') return
+      const base = a.id.replace(/_(x|y|z|color|position)$/, ''), from = byId.get(base)
+      if (!from) return
+      const F = pos.get(from.id), x1 = F.x + W, y1 = F.y + 15, x2 = P.x, y2 = portY(s, i)
+      wires.push(`<path class="w${a.type === 'vec3' ? ' v' : ''}" d="M${x1} ${y1} C${x1 + 30} ${y1} ${x2 - 30} ${y2} ${x2} ${y2}"/>`)
+    })
+    const names = OPS[s.op].ins.map(([n]) => n)
+    const argText = s.args.map((a, i) => `<text x="${P.x + 8}" y="${P.y + 30 + i * 14}">${esc(names[i])}${a.k === 'lit' ? ` <tspan class="lit">${esc(typeof a.v === 'number' ? (+a.v.toFixed(3)) : 'vec3')}</tspan>` : ''}</text>`).join('')
+    boxes.push(`<g class="n${src ? ' src' : ''}" data-line="${lines.get(s.node) ?? 0}" tabindex="0"><rect x="${P.x}" y="${P.y}" width="${W}" height="${H(s)}"/><text class="title" x="${P.x + 8}" y="${P.y + 16}">${esc(label(s).slice(0, 19))}</text>${argText}</g>`)
+  }
+  boxes.push(`<g class="n out"><rect x="${outX}" y="16" width="${W}" height="${outH}"/><text class="title" x="${outX + 8}" y="32">${ir.lit ? 'surface · lit' : 'surface · unlit'}</text>${outList.map(([n], i) => `<text x="${outX + 8}" y="${46 + i * 14}">${n}</text>`).join('')}</g>`)
+  outList.forEach(([, a], i) => {
+    const base = a.id.replace(/_(x|y|z|color|position)$/, ''), from = byId.get(base)
+    if (!from) return
+    const F = pos.get(from.id), x1 = F.x + W, y1 = F.y + 15, x2 = outX, y2 = 42 + i * 14
+    wires.push(`<path class="w${a.type === 'vec3' ? ' v' : ''}" d="M${x1} ${y1} C${x1 + 30} ${y1} ${x2 - 30} ${y2} ${x2} ${y2}"/>`)
+  })
+  svg += wires.join('') + boxes.join('') + '</svg>'
+  const box = $('nodesBox')
+  box.innerHTML = svg
+  for (const g of box.querySelectorAll('g.n[data-line]')) {
+    const go = () => { const n = +g.dataset.line; if (n) goToLine(n) }
+    g.addEventListener('dblclick', go)
+    g.addEventListener('keydown', (e) => { if (e.key === 'Enter') go() })
+    g.addEventListener('click', () => { for (const x of box.querySelectorAll('g.sel')) x.classList.remove('sel'); g.classList.add('sel') })
+  }
+}
+// drag to pan the node view
+{
+  const box = $('nodesBox'); let p = null
+  box.addEventListener('pointerdown', (e) => { if (e.target.closest('g.n')) return; p = { x: e.clientX, y: e.clientY, l: box.scrollLeft, t: box.scrollTop }; box.setPointerCapture(e.pointerId) })
+  box.addEventListener('pointermove', (e) => { if (!p) return; box.scrollLeft = p.l - (e.clientX - p.x); box.scrollTop = p.t - (e.clientY - p.y) })
+  box.addEventListener('pointerup', () => { p = null })
+}
+
+// ------------------------------------------------------------- exports
+for (const [i, [label]] of tabsSpec.entries()) {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'tab'; b.textContent = label; b.setAttribute('role', 'tab')
+  b.addEventListener('click', () => showTab(i)); $('tabs').append(b)
+}
+for (const el of [...document.querySelectorAll('input[name=ueAs]'), $('ueSub')]) el.addEventListener('change', () => showTab(tab))
+let current = ''
+function showTab(i) {
+  tab = i
+  ;[...$('tabs').children].forEach((b, k) => { b.classList.toggle('on', k === i); b.setAttribute('aria-selected', k === i) })
+  $('unrealOpts').hidden = tabsSpec[i][0] !== 'Unreal'
+  if (!ir) return
+  const [, , make, how] = tabsSpec[i]
+  // export the current slider values as the defaults
+  const g2 = { ...graph, params: (graph.params ?? []).map((p) => ({ ...p, default: values[p.id] ?? p.default })) }
+  const saveIr = ir, saveGraph = graph
+  ir = check(g2); graph = g2
+  try { current = make() } finally { ir = saveIr; graph = saveGraph }
+  $('dump').textContent = current
+  $('how').textContent = how
+  renderNotes()
+}
+function renderNotes() {
+  if (!ir) return
+  const tgt = tabsSpec[tab][4]
+  const notes = compat(ir, tgt, { substrate: $('ueSub').checked })
+  const prof = tabsSpec[tab][0] === 'Graph' ? '' : `<div class="close">Preview: ${esc(PROFILES[profileKey].note)}</div>`
+  $('notes').innerHTML = `<div class="sect" style="border:0;padding:0">How it travels to ${esc(tabsSpec[tab][0])}</div>` + notes.map((n) => `<div class="${n.level}">${esc(n.text)}</div>`).join('') + prof
+}
+function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true }, 1800) }
+$('copyBtn').addEventListener('click', () => {
+  const done = () => toast('Copied')
+  const fallback = () => { const r = document.createRange(); r.selectNodeContents($('dump')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('Selected. Press Ctrl+C') }
+  try { navigator.clipboard.writeText(current).then(done, fallback) } catch { fallback() }
+})
+const fileBase = () => (ir?.name ?? 'shader').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+// Saving files works when this page is opened as a file on your computer; inside a hosted preview use Copy.
+function saveFile(blob, name) {
+  if (!isTopLevel) { toast('Open Inoscula Studio from its file to save'); return }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000)
+}
+if (isTopLevel) {
+  $('saveBtn').hidden = false
+  $('saveBtn').addEventListener('click', () => saveFile(new Blob([current], { type: 'text/plain' }), `${fileBase()}.${tabsSpec[tab][1]}`))
+}
+function saveSource() {
+  if (isTopLevel) saveFile(new Blob([src.value], { type: 'text/plain' }), `${fileBase()}.inoscula`)
+  else { try { navigator.clipboard.writeText(src.value).then(() => toast('Code copied'), () => toast('Saved as a draft in this browser')) } catch { toast('Saved as a draft in this browser') } }
+}
+$('saveSrcBtn').addEventListener('click', saveSource)
+$('openBtn').addEventListener('click', () => $('srcIn').click())
+$('srcIn').addEventListener('change', async () => {
+  const f = $('srcIn').files?.[0]; if (!f) return
+  const text = await f.text()
+  openText(text, f.name); $('srcIn').value = ''
+})
+function openText(text, name) {
+  try {
+    const t = text.trim()
+    const code = t.startsWith('{') ? toCode(JSON.parse(t)) : (parse(t), t)
+    src.value = code; $('fileName').textContent = name.replace(/\.json$/, '.inoscula'); values = {}; lfo = {}; compile(); store.set('inoscula-draft', src.value)
+    return true
+  } catch (e) { toast(String(e.message ?? 'That is not a Inoscula shader').slice(0, 90)); return false }
+}
+
+// ------------------------------------------------------------- looks, import
+const lookSel = $('look')
+const groups = {}
+for (const [i, l] of LOOKS.entries()) {
+  const g = groups[l.group] ??= Object.assign(document.createElement('optgroup'), { label: l.group })
+  const o = document.createElement('option'); o.value = i; o.textContent = l.title; g.append(o)
+}
+for (const g of Object.values(groups)) lookSel.append(g)
+function load(i) {
+  const l = LOOKS[i]
+  cardsChoice = null
+  src.value = l.code; $('fileName').textContent = l.file
+  values = {}; lfo = {}
+  setShape(l.shape ?? 'Sphere')
+  compile()
+  src.scrollTop = 0
+}
+lookSel.addEventListener('change', () => load(+lookSel.value))
+const sheet = $('sheet')
+$('importBtn').addEventListener('click', () => { sheet.hidden = false; $('pasteBox').focus() })
+$('sheetCancel').addEventListener('click', () => { sheet.hidden = true })
+$('fileIn').addEventListener('change', async () => { const f = $('fileIn').files?.[0]; if (f) $('pasteBox').value = await f.text() })
+$('sheetOk').addEventListener('click', () => { if (openText($('pasteBox').value, 'imported.inoscula')) sheet.hidden = true })
+$('refBtn').addEventListener('click', () => { $('refSheet').hidden = false })
+$('refClose').addEventListener('click', () => { $('refSheet').hidden = true })
+for (const s of [sheet, $('refSheet')]) s.addEventListener('click', (e) => { if (e.target === s) s.hidden = true })
+addEventListener('keydown', (e) => { if (e.key === 'Escape') { sheet.hidden = true; $('refSheet').hidden = true } })
+$('profile').addEventListener('change', () => setProfile($('profile').value))
+$('envSel').addEventListener('change', () => setEnv($('envSel').value))
+
+// ------------------------------------------------------------- Inoscula Live
+let ws = null
+function liveState(text, cls) { $('livePill').textContent = text; $('livePill').className = 'pill ' + (cls ?? '') }
+$('liveBtn').addEventListener('click', () => {
+  if (ws) { ws.close(); ws = null; liveState('Offline'); $('liveBtn').setAttribute('aria-pressed', 'false'); return }
+  try { ws = new WebSocket('ws://localhost:9420') } catch { liveState('Blocked here', 'warn'); return }
+  liveState('Connecting', 'warn'); $('liveBtn').setAttribute('aria-pressed', 'true')
+  ws.onopen = () => liveState('Live', 'on')
+  ws.onclose = () => { if (ws) liveState('Start inoscula-live', 'warn'); ws = null; $('liveBtn').setAttribute('aria-pressed', 'false') }
+  ws.onerror = () => liveState('Start inoscula-live', 'warn')
+  ws.onmessage = (e) => {
+    try {
+      const m = JSON.parse(e.data)
+      if (!ir || m.material !== ir.name) return
+      const p = ir.params.find((q) => q.id === m.param || q.label === m.param)
+      if (p) setParam(p.id, m.value, 'live')
+    } catch {}
+  }
+})
+let lastSend = 0
+function liveSend(id, v) {
+  if (!ws || ws.readyState !== 1 || !ir) return
+  ws.send(JSON.stringify({ material: ir.name, param: id, value: v }))
+}
+
+// ------------------------------------------------------------- run
+let playing = true, t = 0, last = performance.now()
+$('playBtn').addEventListener('click', () => { playing = !playing; $('playBtn').classList.toggle('on', playing); $('playBtn').textContent = playing ? 'Playing' : 'Paused' })
+$('scrub').addEventListener('input', () => { t = +$('scrub').value; if (playing) $('playBtn').click() })
+// When a heavy shader makes frames slow, render at a lower resolution until it is smooth again.
+function adaptQuality(ms) {
+  frameAvg = frameAvg * 0.9 + ms * 0.1
+  if (++sinceChange < 20) return
+  if (frameAvg > 70 && quality > 0.35) { quality = Math.max(0.35, quality * 0.75); sinceChange = 0; resize() }
+  else if (frameAvg < 24 && quality < 1) { quality = Math.min(1, quality / 0.75); sinceChange = 0; resize() }
+}
+function frame(now) {
+  requestAnimationFrame(frame)
+  if (compiling || document.hidden) { last = now; return }
+  adaptQuality(now - last)
+  const dt = Math.min(0.1, (now - last) / 1000); last = now
+  if (playing) { t += dt; $('scrub').value = t % 10 }
+  $('clock').textContent = t.toFixed(2) + 's'
+  sun.position.set(Math.cos(lightPitch) * Math.sin(lightYaw), Math.sin(lightPitch), Math.cos(lightPitch) * Math.cos(lightYaw)).multiplyScalar(6)
+  for (const [id, l] of Object.entries(lfo)) {
+    const v = l.lo + (l.hi - l.lo) * (0.5 - 0.5 * Math.cos((t - l.t0) * Math.PI * 0.5))
+    values[id] = v; setUniform(id, v)
+    if (rows[id]) { rows[id].inp.value = v; rows[id].out.textContent = v.toFixed(2) }
+    if (now - lastSend > 50) liveSend(id, v)
+  }
+  if (now - lastSend > 50) lastSend = now
+  if (uniforms) {
+    uniforms.inoscula_time.value = t
+    uniforms.inoscula_light_dir.value.copy(sun.position).normalize()
+    uniforms.inoscula_light_color.value.set(sun.color.r, sun.color.g, sun.color.b)
+  }
+  renderer.render(scene, cam)
+}
+setEnv('studio'); setProfile('rico')
+const draft = store.get('inoscula-draft')
+load(0)
+if (draft && draft !== src.value && /void\s+main/.test(draft)) { src.value = draft; $('fileName').textContent = 'draft.inoscula'; compile() }
+resize()
+requestAnimationFrame(frame)
+window.__ready = true
+</script>

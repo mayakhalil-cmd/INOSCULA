@@ -1,0 +1,6 @@
+Inoscula
+Copyright 2026 Maya Khalil
+
+This product includes a port of the Perlin noise, hash and fractal noise functions from Blender's Cycles
+renderer (intern/cycles/kernel/svm/noise.h and related files), Copyright Blender Foundation, licensed under
+the Apache License 2.0. The port lives in src/code.ts (inoscula_hash3, inoscula_perlin3, inoscula_noise).

@@ -1,0 +1,26 @@
+{
+  "inoscula": "0.1",
+  "name": "Rim Glow",
+  "params": [
+    { "id": "base", "type": "color", "default": [0.02, 0.02, 0.04], "label": "Base" },
+    { "id": "glow", "type": "color", "default": [0.1, 1.0, 0.45], "label": "Glow" },
+    { "id": "power", "type": "float", "default": 3.0, "min": 0.5, "max": 8, "label": "Rim Power" },
+    { "id": "speed", "type": "float", "default": 1.5, "min": 0, "max": 6, "label": "Pulse Speed" }
+  ],
+  "nodes": [
+    { "id": "n", "op": "normal" },
+    { "id": "v", "op": "view_dir" },
+    { "id": "t", "op": "time" },
+    { "id": "ndv", "op": "dot", "in": { "a": "n", "b": "v" } },
+    { "id": "f0", "op": "max", "in": { "a": "ndv", "b": 0.0 } },
+    { "id": "f1", "op": "one_minus", "in": { "x": "f0" } },
+    { "id": "f2", "op": "pow", "in": { "a": "f1", "b": "$power" } },
+    { "id": "ts", "op": "mul", "in": { "a": "t", "b": "$speed" } },
+    { "id": "pulse", "op": "sin", "in": { "x": "ts" } },
+    { "id": "pulse2", "op": "mul", "in": { "a": "pulse", "b": 0.25 } },
+    { "id": "pulse3", "op": "add", "in": { "a": "pulse2", "b": 0.75 } },
+    { "id": "amt", "op": "mul", "in": { "a": "f2", "b": "pulse3" } },
+    { "id": "c", "op": "mix", "in": { "a": "$base", "b": "$glow", "t": "amt" } }
+  ],
+  "output": { "color": "c" }
+}
