@@ -19,6 +19,7 @@ You do not need to know how to code, and there is nothing to install.
 4. Open the Code tab and change one number, for example a color. It rebuilds as you type.
 5. Open the Check tab to see how the shader will look in each program.
 6. Pick your program next to the tabs (say Unreal), follow the steps it shows, and press Save file.
+7. Then follow "Step by step, for complete beginners" below to put it on a model.
 
 The tour shows you around the first time you open the Studio, and Help (F1) is always one click away.
 
@@ -211,6 +212,97 @@ RICO renders with three.js, so the adapter in `src/rico.ts` turns a shader into 
 
 Set **Preview as** in the Studio to your program to see it with that program's tonemapping, and open the Check
 tab to see how closely it will match. `docs/TESTING.md` has a full test for each program.
+
+## Step by step, for complete beginners
+
+These steps start from nothing and end with a look on a model. Try a plain sphere first, then your own model.
+The Studio's file for each program is the one in the table above (Save file in that program's tab).
+
+### Blender
+
+1. Download Blender (4.2 or later) from blender.org and open it. The start scene has a cube in it.
+2. Make a smooth ball to test on. Hover over the 3D view, press **Shift+A**, then Mesh, then UV Sphere. Right-click
+   the sphere and choose **Shade Smooth**. For your own model, use File, Import, glTF (for a `.glb`) instead.
+3. Click the object so it has an orange outline. The material goes on whatever is selected.
+4. At the top of the window, click the **Scripting** tab. In the Text Editor in the middle, press **Open**, pick
+   `name.blender.py`, then press **Run Script** (the play button).
+5. Go back to the **Layout** tab. In the top right of the 3D view there are four small sphere icons. Click the
+   fourth one (Rendered). The look now shows on the object.
+6. To change it, open the **Shading** tab and click the object. The big group node holds every slider.
+7. For looks that use the light direction, press **Shift+A**, then Light, then Sun. In the Outliner (top right),
+   double-click the sun and rename it `RICO Sun`, then run the script once more.
+
+For glass looks (Hard Reflections), put something with color behind the object, for example **Shift+A**, Mesh,
+Monkey, moved behind it. The glass shows what is behind it, so on a plain gray floor it looks gray. In Cycles the
+view starts grainy and clears up. In Eevee, glass seen through other glass shows the world color, so keep glass
+objects apart or render in Cycles (Properties, Render, Render Engine).
+
+### Godot
+
+1. Download Godot (4.4 or later) for your computer from godotengine.org. Unzip it and double-click the program.
+   Nothing needs installing.
+2. In the Project Manager, press **Create**. Give the project a name, pick an empty folder, keep **Forward+** and
+   create it.
+3. In the **Scene** panel on the left, click **3D Scene**.
+4. Press the **+** at the top of the Scene panel, search `MeshInstance3D` and press Create. In the **Inspector** on
+   the right, click the empty **Mesh** slot and choose **New SphereMesh**. For your own model, drag the `.glb` into
+   the FileSystem panel (bottom left), then drag it from there into the 3D view.
+5. Drag `name.gdshader` (or `name.tres`) from your computer's folder into the **FileSystem** panel.
+6. Click the sphere in the Scene panel. In the Inspector, open **Geometry**, click the empty **Material Override**
+   slot and choose **New ShaderMaterial**.
+7. Click the new ShaderMaterial to open it. Drag the shader file from FileSystem onto its **Shader** slot. The
+   sliders appear under **Shader Parameters**.
+8. For looks with an outline, click the empty **Next Pass** slot of that material, choose **New ShaderMaterial**
+   and give it `name.outline.gdshader` the same way.
+9. For looks that use the light direction, add a `DirectionalLight3D` with the **+**. Drag
+   `inoscula_light_bridge.gd` from FileSystem onto the top node in the Scene panel and pick your light in its
+   **Light** slot. Press Ctrl+S, then Scene, Reload Saved Scene, so the bridge starts running in the editor.
+
+For glass looks, add a second MeshInstance3D with **New BoxMesh** behind the sphere (Transform, Position Z `-3`).
+
+### Unreal
+
+1. Install Unreal Engine (5.4 or later) from the Epic Games Launcher and make a new blank project.
+2. Turn on Python once. Edit, Plugins, search `Python Editor Script Plugin`, tick it and restart Unreal.
+3. Put a shape in the level. In the toolbar, click the add button (a cube with a green plus), then Shapes, then
+   Sphere. For your own model, drag the `.glb` or `.fbx` into the Content Browser (for a `.glb` from the Studio,
+   set Import Vertex Color to Replace), then drag it from there into the level.
+4. Click the object in the level so it is selected.
+5. Tools, **Execute Python Script**, and pick `name.unreal.py`. It builds the material and puts it on the selected
+   object. The Output Log (Window, Output Log) says how many meshes it put it on.
+6. The sliders are in `MI_name` in the Content Browser, in the Inoscula folder. Double-click it and move them.
+   Looks that use the light direction have an **Inoscula Light Direction** slider there. Unreal does not feed it
+   from your sun, so set it to point the way your light comes from.
+7. If the script reports an error, run `name.unreal-custom.py` the same way. It is the simpler form.
+
+### Unity
+
+1. Install **Unity Hub** from unity.com/download and open it. Sign in (a free Personal account is fine).
+2. In the Hub, open **Installs**, press **Install Editor** and pick the newest **Unity 6** with LTS next to it.
+   This is a large download. When it finishes, the editor sits in `C:\Program Files\Unity\Hub\Editor`.
+3. Open **Projects**, press **New project**, pick the **Universal 3D** template, name it and press Create project.
+4. Put a shape in the scene. In the **Hierarchy** on the left, right-click, then 3D Object, then Sphere.
+5. Drag `name.shader` from your computer's folder into the **Project** window at the bottom.
+6. Right-click the shader in the Project window and choose **Create, Material**.
+7. Drag the new material onto the sphere in the Scene view. The sliders are on the material in the Inspector,
+   and the look lights from the scene's Directional Light.
+8. For your own model, drag an `.fbx` or `.obj` into the Project window, then into the Scene. For a `.glb` from the
+   Studio, first add glTF support with Window, Package Manager, +, Add package by name, `com.unity.cloud.gltfast`.
+
+Glass looks are not see-through in Unity yet. They show their colors only.
+
+### When nothing shows
+
+- **The object is plain gray or white.** The material is not on it. Select the object and run the script again
+  (Blender, Unreal), or check the Material Override slot (Godot) or the material on the object (Unity).
+- **Blender shows no color at all.** The 3D view is in Solid mode. Pick the fourth sphere icon (Rendered).
+- **Godot shows the object blank or wrong.** Open the shader file in Godot. If it did not compile, the shader
+  editor at the bottom names the line.
+- **Unity shows a pink object.** The project is not a Universal 3D (URP) project. Make a new one with that
+  template.
+- **The look ignores your light.** In Blender, add a sun and run the script again. In Godot, add the light
+  bridge. In Unreal, set **Inoscula Light Direction** in `MI_name` by hand. Unity uses the scene's Directional
+  Light by itself.
 
 ## What you can make
 
@@ -481,7 +573,10 @@ See `docs/TESTING.md` for a step by step test in each program, and `SPEC.md` for
   in material, Material Function and Substrate form. `docs/TESTING.md` says how to test each one.
 - **TouchDesigner** code is read and checked in the browser against TouchDesigner's documented GLSL TOP inputs.
   It has not been checked inside TouchDesigner itself yet.
-- **Eevee** uses the same nodes as Cycles but was not measured separately.
+- **Eevee** uses the same nodes as Cycles but was not measured separately. Its glass does not show other glass
+  behind it.
+- **Glass** (Hard Reflections) is see-through in Blender, Godot, Unreal and RICO. In Unity it shows its colors
+  only.
 - **Rim and outline shells** (Wet Stroke) are made in INOSCULA Studio, RICO (`look.addShells(mesh)`) and Blender
   (`importers/inoscula_shells_blender.py`). For Godot, Unreal and Unity, bring the model saved from INOSCULA
   Studio.
