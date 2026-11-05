@@ -1,4 +1,4 @@
-// Claymation: modelling clay, fingerprints, tool marks, waxy sheen
+// Claymation: modeling clay, fingerprints, tool marks, waxy sheen
 name "Claymation";
 shading "lit";
 
@@ -55,7 +55,7 @@ void main() {
   vec3 n = object_normal;
   float s = object_size / 2.0;
 
-  // Marbled clay: two colours kneaded together in long smeared streaks
+  // Marbled clay: two colors kneaded together in long smeared streaks
   vec3 sp = p + nudge * 0.004 * handling;
   float knead = noise(sp * vec3(1.0, 1.0, 3.5) / s + vec3(noise(sp / s, 1.5, 2.0, 0.5, 2.0) * 1.5), 1.8, 3.0, 0.55, 2.0);
   float vein = smoothstep(0.5, 0.6, knead) * marble;
@@ -69,12 +69,12 @@ void main() {
   float dish = max(fa.y, fb.y);
   float printed = max(fa.z, fb.z);
 
-  // Tool marks: dragged, parallel scrapes from a modelling tool, and pressed dents
+  // Tool marks: dragged, parallel scrapes from a modeling tool, and pressed dents
   float drag = noise(sp * vec3(28.0, 28.0, 2.5) / s, 1.0, 2.0, 0.5, 2.0);
   float scrape = smoothstep(0.55, 0.75, drag) * smoothstep(0.45, 0.6, noise(sp / s, 2.2, 1.0, 0.5, 2.0)) * tools;
   float dent = smoothstep(0.62, 0.8, noise(sp / s + vec3(40.0), 3.0, 1.0, 0.5, 2.0)) * dents;
 
-  // Colour: ridges and scrapes catch a little dust, creases hold grime
+  // Color: ridges and scrapes catch a little dust, creases hold grime
   vec3 c = base * (1.0 - ridge * 0.12 - scrape * 0.1);
   c = mix(c, c * vec3(0.45, 0.38, 0.36), (1.0 - occlusion) * grime);
   color = c;

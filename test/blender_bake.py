@@ -16,7 +16,7 @@ def fresh():
     sc.cycles.device = "CPU"
     sc.cycles.samples = 1
     sc.cycles.use_denoising = False
-    sc.cycles.filter_width = 0.01  # sample texel centres, no pixel filter jitter
+    sc.cycles.filter_width = 0.01  # sample texel centers, no pixel filter jitter
     sc.frame_set(0)
     me = bpy.data.meshes.new("Ball")
     bm = bmesh.new()

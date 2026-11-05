@@ -18,7 +18,7 @@ for (const p of graph.params ?? []) {
   const v = m[1].trim()
   const nums = (v.match(/-?[\d.]+(e-?\d+)?/g) ?? []).map(Number)
   if (p.type === 'float' && nums.length) p.default = nums[0]
-  else if (nums.length >= 3) p.default = p.type === 'color' ? nums.slice(0, 3).map(lin) : nums.slice(0, 3) // Godot stores colours as sRGB
+  else if (nums.length >= 3) p.default = p.type === 'color' ? nums.slice(0, 3).map(lin) : nums.slice(0, 3) // Godot stores colors as sRGB
   n++
 }
 const dest = out ?? matFile.replace(/\.(tres|tscn)$/, '') + '.inoscula.json'

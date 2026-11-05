@@ -1,4 +1,4 @@
-// Inoscula code: write a shader as text, the way you would in GLSL, and get a Inoscula graph (and so native nodes in
+// Inoscula code: write a shader as text, the way you would in GLSL, and get an Inoscula graph (and so native nodes in
 // every tool). It also prints any graph back out as code, so nodes and code are two views of one shader.
 //
 //   name "Ink Wash";
@@ -58,13 +58,14 @@ const BUILTINS: Record<string, string> = {
   curvature: 'curvature', occlusion: 'occlusion', object_size: 'object_size',
 }
 // what a shader can set. color and alpha always; the rest make it a lit (physically based) material
-const OUTS = ['color', 'alpha', 'roughness', 'metallic', 'bump', 'emission', 'coat', 'coat_roughness', 'sheen', 'sheen_color', 'sheen_roughness', 'subsurface', 'outline', 'outline_color', 'outline_breakup', 'outline_rings']
+const isZero = (a: { k: string; v?: unknown }) => a.k === 'lit' && a.v === 0
+const OUTS = ['color', 'alpha', 'roughness', 'metallic', 'bump', 'emission', 'coat', 'coat_roughness', 'sheen', 'sheen_color', 'sheen_roughness', 'subsurface', 'outline', 'outline_color', 'outline_breakup', 'outline_rings', 'outline_offset', 'outline_boil', 'glass', 'ior', 'dispersion']
 const isOut = (s: string) => OUTS.includes(s)
 const CONSTS: Record<string, number> = { PI: Math.PI, TAU: Math.PI * 2 }
 // function name -> [op, input names in call order]
 const CALLS: Record<string, [string, string[]]> = {
   sin: ['sin', ['x']], cos: ['cos', ['x']], abs: ['abs', ['x']], floor: ['floor', ['x']], fract: ['fract', ['x']],
-  exp: ['exp', ['x']], sqrt: ['sqrt', ['x']], pow: ['pow', ['a', 'b']], min: ['min', ['a', 'b']], max: ['max', ['a', 'b']],
+  exp: ['exp', ['x']], log: ['log', ['x']], sqrt: ['sqrt', ['x']], pow: ['pow', ['a', 'b']], min: ['min', ['a', 'b']], max: ['max', ['a', 'b']],
   clamp: ['clamp', ['x', 'lo', 'hi']], mix: ['mix', ['a', 'b', 't']], lerp: ['mix', ['a', 'b', 't']],
   smoothstep: ['smoothstep', ['e0', 'e1', 'x']], dot: ['dot', ['a', 'b']], length: ['length', ['x']],
   normalize: ['normalize', ['x']], one_minus: ['one_minus', ['x']], atan: ['atan2', ['y', 'x']], atan2: ['atan2', ['y', 'x']],
@@ -102,7 +103,14 @@ export function parse(src: string): Graph {
   const calling: string[] = []
   let curLine = 1
 
-  const fresh = (base: string) => { const n = (ids.get(base) ?? 0) + 1; ids.set(base, n); return n === 1 ? base : `${base}_${n}` }
+  // a new node id from a base name; never one already given out, even when a variable is named like one (mul_2)
+  const taken = new Set<string>()
+  const fresh = (base: string) => {
+    let n = (ids.get(base) ?? 0) + 1, id = n === 1 ? base : `${base}_${n}`
+    while (taken.has(id)) id = `${base}_${++n}`
+    ids.set(base, n); taken.add(id)
+    return id
+  }
   const add = (op: string, ins: Record<string, Val>, base: string = op, set?: Record<string, unknown>): Val => {
     const id = fresh(base)
     const node: Node = { id, op }
@@ -224,7 +232,7 @@ export function parse(src: string): Graph {
       case 'radians': need(1); return isNum(a[0]) ? a[0] * Math.PI / 180 : add('mul', { a: a[0], b: Math.PI / 180 })
     }
     const c = CALLS[fn]
-    if (!c) err(`"${fn}" is not a Inoscula function. Available: ${[...Object.keys(CALLS), 'vec3', 'ramp', 'step', 'saturate', 'mod', 'reflect', 'distance', 'sign', 'radians'].sort().join(', ')}.`, tk)
+    if (!c) err(`"${fn}" is not an Inoscula function. Available: ${[...Object.keys(CALLS), 'vec3', 'ramp', 'step', 'saturate', 'mod', 'reflect', 'distance', 'sign', 'radians'].sort().join(', ')}.`, tk)
     const [op, names] = c
     const max = names.length, min = op === 'noise' ? 1 : max
     if (a.length < min || a.length > max) err(`${fn}() takes ${min === max ? max : `${min} to ${max}`} values.`, tk)
@@ -242,9 +250,9 @@ export function parse(src: string): Graph {
     const stops: [number, number[]][] = []
     while (is(',')) {
       next()
-      const pos = expr(); expect(',', 'a comma, then the colour for this stop')
+      const pos = expr(); expect(',', 'a comma, then the color for this stop')
       const col = expr()
-      if (!isNum(pos) || !Array.isArray(col)) err('ramp() stops are fixed numbers and colours, such as 0.5, vec3(1.0, 0.2, 0.0).', tk)
+      if (!isNum(pos) || !Array.isArray(col)) err('ramp() stops are fixed numbers and colors, such as 0.5, vec3(1.0, 0.2, 0.0).', tk)
       stops.push([pos as number, col as number[]])
     }
     expect(')')
@@ -313,6 +321,23 @@ export function parse(src: string): Graph {
     if (range) { prm.min = parseFloat(range[1]); prm.max = parseFloat(range[2]) }
     const label = /@label\s+([^@]+)/.exec(note)
     if (label) prm.label = label[1].trim()
+    const step = /@step\s+([\d.]+)/.exec(note)
+    if (step) prm.step = parseFloat(step[1])
+    const group = /@group\s+([^@]+)/.exec(note)
+    if (group) prm.group = group[1].trim()
+    const desc = /@desc\s+([^@]+)/.exec(note)
+    if (desc) prm.desc = desc[1].trim()
+    if (/@toggle\b/.test(note)) {
+      if (ty.v !== 'float') err('@toggle is for float parameters (0 is off, 1 is on).', nm)
+      Object.assign(prm, { ui: 'toggle', min: 0, max: 1, step: 1 })
+    }
+    const opts = /@options\s+([^@]+)/.exec(note)
+    if (opts) {
+      if (ty.v !== 'float') err('@options is for float parameters: the first choice is 0, the next 1, and so on.', nm)
+      const list = opts[1].split('|').map((o) => o.trim()).filter(Boolean)
+      if (list.length < 2) err('@options needs at least two choices, split with |, for example: @options Soft | Hard', nm)
+      Object.assign(prm, { ui: 'menu', options: list, min: 0, max: list.length - 1, step: 1 })
+    }
     params.push(prm)
     vars.set(nm.v, '$' + nm.v)
   }
@@ -407,7 +432,13 @@ export function parse(src: string): Graph {
 }
 
 // ---------------------------------------------------------------- graph -> code
-const fmt = (x: number) => { const s = String(+x.toFixed(6)); return /[.e]/.test(s) ? s : s + '.0' }
+// the fewest digits that read back as the same 32-bit float, which is what every shader works in
+const fmt = (x: number) => {
+  const f = Math.fround(x)
+  let s = String(f)
+  for (let p = 1; p <= 9; p++) { const t = +f.toPrecision(p); if (Math.fround(t) === f) { s = String(t); break } }
+  return /[.e]/.test(s) ? s : s + '.0'
+}
 const litCode = (v: Lit) => (typeof v === 'number' ? fmt(v) : `vec3(${v.map(fmt).join(', ')})`)
 const NAMES: Record<string, string> = { atan2: 'atan2' }
 
@@ -430,7 +461,9 @@ export function toCode(g: Graph): string {
   }
   const lines = [`name "${ir.name}";`, ...(ir.lit ? ['shading "lit";'] : []), ...(ir.cutout ? ['surface "cutout";'] : []), ...(ir.source.shells ? [`shells ${ir.source.shells.rim}, ${ir.source.shells.outline}, ${ir.source.shells.offset};`] : []), ...(ir.source.cards ? [`cards ${ir.source.cards.count}, ${ir.source.cards.length}, ${ir.source.cards.width}${ir.source.cards.lift !== undefined ? ', ' + ir.source.cards.lift : ''};`] : []), '']
   for (const p of ir.params) {
-    const notes = [p.type === 'color' ? '@color' : '', p.min !== undefined && p.max !== undefined ? `@range ${p.min} ${p.max}` : '', p.label ? `@label ${p.label}` : ''].filter(Boolean).join(' ')
+    const ui = p.ui === 'toggle' ? '@toggle' : p.ui === 'menu' && p.options ? `@options ${p.options.join(' | ')}` : ''
+    const notes = [p.type === 'color' ? '@color' : '', ui, !ui && p.min !== undefined && p.max !== undefined ? `@range ${p.min} ${p.max}` : '', !ui && p.step ? `@step ${p.step}` : '',
+      p.group ? `@group ${p.group}` : '', p.desc ? `@desc ${p.desc}` : '', p.label ? `@label ${p.label}` : ''].filter(Boolean).join(' ')
     lines.push(`uniform ${p.t} ${p.id} = ${litCode(p.default)};${notes ? '  // ' + notes : ''}`)
   }
   lines.push('', 'void main() {')
@@ -459,7 +492,8 @@ export function toCode(g: Graph): string {
     if (ir.emission) lines.push(`  emission = ${w(ir.emission)};`)
     for (const [k, a] of Object.entries(ir.layers)) if (a) lines.push(`  ${k} = ${w(a)};`)
   }
-  if (ir.outline) lines.push(`  outline = ${w(ir.outline.width)};`, `  outline_color = ${w(ir.outline.color)};`, `  outline_breakup = ${w(ir.outline.breakup)};`, ...(ir.outline.rings ? [`  outline_rings = ${ir.outline.rings}.0;`] : []))
+  if (ir.outline) lines.push(`  outline = ${w(ir.outline.width)};`, `  outline_color = ${w(ir.outline.color)};`, `  outline_breakup = ${w(ir.outline.breakup)};`, ...(ir.outline.rings ? [`  outline_rings = ${ir.outline.rings}.0;`] : []), ...(isZero(ir.outline.offset) ? [] : [`  outline_offset = ${w(ir.outline.offset)};`]), ...(isZero(ir.outline.boil) ? [] : [`  outline_boil = ${w(ir.outline.boil)};`]))
+  if (ir.glass) lines.push(`  glass = ${w(ir.glass.amount)};`, `  ior = ${w(ir.glass.ior)};`, ...(isZero(ir.glass.dispersion) ? [] : [`  dispersion = ${w(ir.glass.dispersion)};`]))
   lines.push('}')
   return lines.join('\n') + '\n'
 }

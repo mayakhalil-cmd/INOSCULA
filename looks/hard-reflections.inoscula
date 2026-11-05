@@ -9,6 +9,9 @@ uniform float width = 0.55;                         // @range 0 1 @label Hotspot
 uniform float rimWidth = 0.28;                      // @range 0 0.8 @label Rim Width
 uniform float scribble = 0.5;                       // @range 0 1 @label Scribbles
 uniform float spin = 0.0;                           // @range 0 6.283 @label Rotate Lights
+uniform float clarity = 0.85;                       // @range 0 1 @label Glass Clarity
+uniform float bend = 1.45;                          // @range 1 2.4 @label Glass IOR
+uniform float prism = 0.6;                          // @range 0 1 @label Glass Dispersion
 
 // Rotate around vertical
 vec3 turn(vec3 d, float a) {
@@ -33,4 +36,9 @@ void main() {
 
   float m = max(max(spots, rim), scr);
   color = mix(dark, shine, m);
+
+  // Glass: the dark body turns see-through and bends what is behind it; the white reflections stay solid
+  glass = clarity * (1.0 - m);
+  ior = bend;
+  dispersion = prism;
 }

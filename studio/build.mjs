@@ -7,17 +7,18 @@ import path from 'node:path'
 import { stripTypeScriptTypes } from 'node:module'
 
 const [threeFile, outDir, fontDir] = process.argv.slice(2)
-const files = ['src/cards.ts', 'src/spec.ts', 'src/code.ts', 'src/targets/three.ts', 'src/targets/godot.ts', 'src/targets/hlsl.ts', 'src/targets/blender.ts', 'src/lang.ts', 'src/compat.ts', 'src/nodes.ts', 'src/native.ts']
+const files = ['src/cards.ts', 'src/spec.ts', 'src/code.ts', 'src/targets/three.ts', 'src/targets/godot.ts', 'src/targets/hlsl.ts', 'src/targets/blender.ts', 'src/lang.ts', 'src/compat.ts', 'src/nodes.ts', 'src/native.ts',
+  'src/glsl/types.ts', 'src/glsl/pre.ts', 'src/glsl/parse.ts', 'src/glsl/build.ts', 'src/glsl/eval.ts', 'src/glsl/index.ts', 'src/glsl/hlsl.ts', 'src/read.ts']
 let bundle = ''
 for (const f of files) {
   const js = stripTypeScriptTypes(fs.readFileSync(f, 'utf8'))
-    .split('\n').filter((l) => !/^\s*import\s/.test(l)).join('\n')
+    .split('\n').filter((l) => !/^import\s.*\sfrom\s+['"]|^import\s+['"]/.test(l)).join('\n')
     .replace(/^export (class|const|function|let)/gm, '$1')
   bundle += `// ---- ${f}\n${js}\n`
 }
 const groups = {
   'Painterly': [['oil-paint', 'Sphere'], ['wet-stroke', 'Puppet'], ['hand-painted', 'Puppet'], ['oil-strokes', 'Puppet'], ['paint-strokes', 'Puppet'], ['painted-planes', 'Knot'], ['paint-with-light', 'Puppet'], ['painted-character', 'Puppet']],
-  'Stylised': [['paint-bands', 'Knot'], ['hard-reflections', 'Knot'], ['comic-print', 'Knot'], ['mono-ink', 'Puppet'], ['engraving', 'Knot'], ['grain-gradient', 'Puppet'], ['iridescent', 'Knot']],
+  'Stylized': [['paint-bands', 'Knot'], ['hard-reflections', 'Knot'], ['comic-print', 'Knot'], ['mono-ink', 'Puppet'], ['engraving', 'Knot'], ['grain-gradient', 'Puppet'], ['iridescent', 'Knot'], ['retro-bits', 'Puppet']],
   'Stop motion and craft': [['claymation', 'Puppet']],
 }
 const looks = Object.entries(groups).flatMap(([group, list]) => list.map(([n, shape]) => {
@@ -34,13 +35,13 @@ const fonts = fontDir ? `@font-face { font-family: 'Courier Prime'; font-weight:
 html = html.replace('/*FONTS*/', fonts).replace('/*INOSCULA_BUNDLE*/', () => bundle).replace('/*LOOKS*/', () => JSON.stringify(looks))
 const three = fs.readFileSync(threeFile, 'utf8')
 const jsm = path.join(path.dirname(threeFile), '..', 'examples', 'jsm')
-const addons = ['loaders/GLTFLoader.js', 'loaders/OBJLoader.js', 'exporters/GLTFExporter.js', 'utils/BufferGeometryUtils.js']
+const addons = ['loaders/GLTFLoader.js', 'loaders/OBJLoader.js', 'exporters/GLTFExporter.js', 'utils/BufferGeometryUtils.js', 'controls/OrbitControls.js', 'controls/TransformControls.js', 'helpers/ViewHelper.js']
 const data = (js) => 'data:text/javascript;base64,' + Buffer.from(js).toString('base64')
 const offlineMap = { three: data(three) }
 for (const a of addons) offlineMap['three/addons/' + a] = data(fs.readFileSync(path.join(jsm, a), 'utf8').replace(/'\.\.\/utils\/BufferGeometryUtils\.js'/g, "'three/addons/utils/BufferGeometryUtils.js'"))
 const offline = `<script type="importmap">${JSON.stringify({ imports: offlineMap })}</script>`
 const web = `<script type="importmap">${JSON.stringify({ imports: { three: 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js', 'three/addons/': 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/' } })}</script>`
 fs.mkdirSync(outDir, { recursive: true })
-fs.writeFileSync(path.join(outDir, 'inoscula-studio.html'), `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n${html.replace('<!--THREE_LOADER-->', () => offline)}\n</head></html>`.replace('</style>\n\n<div class="app">', '</style>\n</head><body>\n<div class="app">').replace(/\n<\/head><\/html>$/, '\n</body></html>'))
+fs.writeFileSync(path.join(outDir, 'inoscula-studio.html'), `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n${html.replace('<!--THREE_LOADER-->', () => offline)}\n</head></html>`.replace('</style>\n\n<div class="app"', '</style>\n</head><body>\n<div class="app"').replace(/\n<\/head><\/html>$/, '\n</body></html>'))
 fs.writeFileSync(path.join(outDir, 'inoscula-studio.web.html'), html.replace('<!--THREE_LOADER-->', () => web))
 console.log('built', fs.statSync(path.join(outDir, 'inoscula-studio.html')).size, 'bytes offline,', fs.statSync(path.join(outDir, 'inoscula-studio.web.html')).size, 'bytes web')

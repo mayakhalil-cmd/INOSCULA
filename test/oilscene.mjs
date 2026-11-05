@@ -1,5 +1,5 @@
 // A still life for reflective painterly looks: glossy spheres, a box and cylinders in a room lit by teal,
-// orange and pink panels, with one key light whose colour you choose. Renders one look at 1000 x 750.
+// orange and pink panels, with one key light whose color you choose. Renders one look at 1000 x 750.
 //   node test/oilscene.mjs <three.module.js> <out.png> <look.inoscula> [light hex] [seconds]
 import fs from 'node:fs'
 import http from 'node:http'
@@ -55,12 +55,12 @@ for (const [g, p, rot] of objs) {
   m.position.set(...p); m.rotation.set(...rot); m.castShadow = m.receiveShadow = true
   scene.add(m); m.updateMatrixWorld(true); if (graph.shells) look.addShells(m); if (graph.cards) look.addCards(m); look.fitTo(m); look.addOutline(m); looks.push(look)
 }
-// a plain backdrop wall behind the objects (SOLIDBG), same colour as the floor, catching shadows
+// a plain backdrop wall behind the objects (SOLIDBG), same color as the floor, catching shadows
 if (${process.env.SOLIDBG ? 'true' : 'false'}) {
   const wall = new THREE.Mesh(new THREE.PlaneGeometry(30, 14), new THREE.MeshStandardMaterial({ color: new THREE.Color(${process.env.FLOOR ?? '0.1, 0.1, 0.1'}), roughness: 0.9 }))
   wall.position.set(0, 5.5, -4); wall.receiveShadow = true; scene.add(wall)
 }
-// painted floor and wall (PAINTBG): the same look, with its own colours (SETBG)
+// painted floor and wall (PAINTBG): the same look, with its own colors (SETBG)
 if (${process.env.PAINTBG ? 'true' : 'false'}) {
   floor.visible = false
   const SETBG = ${process.env.SETBG ?? '{}'}

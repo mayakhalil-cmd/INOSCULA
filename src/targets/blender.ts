@@ -2,7 +2,7 @@
 // group whose inputs are the parameters. No code nodes and no baking: Eevee has no code node, so every step is
 // expanded into Blender's own Math, Vector Math, Mix, Map Range, Color Ramp and Noise Texture nodes.
 import type { Arg, IR, Step } from '../spec.ts'
-import { rampStops } from '../spec.ts'
+import { paramDesc, rampStops } from '../spec.ts'
 
 const py = (s: string) => JSON.stringify(s)
 const pyNum = (x: number) => (Number.isFinite(x) ? String(x) : '0.0')
@@ -10,12 +10,23 @@ const pyNum = (x: number) => (Number.isFinite(x) ? String(x) : '0.0')
 interface Ctx { lines: string[]; n: number; depth: Map<string, number>; sock: Map<string, string> }
 
 // The outline from the classic hand-built setup: a Solidify modifier with flipped normals that uses a second
-// material, which is see-through where it faces the camera. Width and colour follow the group's parameters.
+// material, which is see-through where it faces the camera. Width and color follow the group's parameters.
 function blenderOutline(ir: IR, label: (a: Arg) => string | null): string {
   const o = ir.outline!
-  const wl = label(o.width), cl = label(o.color), bl = label(o.breakup)
+  const wl = label(o.width), cl = label(o.color), bl = label(o.breakup), fl = label(o.offset), ol = label(o.boil)
   const bvv = o.breakup.k === 'lit' ? pyNum(o.breakup.v as number) : '0.0'
   const wv = o.width.k === 'lit' ? pyNum(o.width.v as number) : '0.02'
+  const fvv = o.offset.k === 'lit' ? pyNum(o.offset.v as number) : '0.0'
+  const ovv = o.boil.k === 'lit' ? pyNum(o.boil.v as number) : '0.0'
+  // a Value node that follows one of the group's parameters (or holds a fixed number)
+  const follow = (node: string, lab: string | null) => lab ? `d = ${node}.outputs[0].driver_add("default_value").driver
+d.type = "AVERAGE"
+v = d.variables.new()
+v.type = "SINGLE_PROP"
+v.targets[0].id_type = "MATERIAL"
+v.targets[0].id = m
+v.targets[0].data_path = 'node_tree.nodes["%s"].inputs["%s"].default_value' % (gn.name, ${py(lab)})
+` : ''
   const cv = o.color.k === 'lit' ? `(${(o.color.v as number[]).map(pyNum).join(', ')}, 1.0)` : '(0.02, 0.02, 0.03, 1.0)'
   return `# ---- outline: Solidify (flipped normals) with its own material on every object that uses this one
 om = bpy.data.materials.get(MAT + " Outline") or bpy.data.materials.new(MAT + " Outline")
@@ -37,7 +48,36 @@ if hasattr(o_nz, "normalize"):
     o_nz.normalize = True
 for k, val in (("Scale", 30.0), ("Detail", 2.0), ("Roughness", 0.5), ("Lacunarity", 2.0), ("Distortion", 0.0)):
     S(o_nz.inputs, k).default_value = val
-ont.links.new(o_tc.outputs["Object"], S(o_nz.inputs, "Vector"))
+# boil: the noise jumps to a new place this many times a second, so the line redraws like hand animation
+o_bo = ont.nodes.new("ShaderNodeValue")
+o_bo.label = "Outline Boil"
+o_bo.outputs[0].default_value = ${ovv}
+o_tm = ont.nodes.new("ShaderNodeValue")
+o_tm.label = "Time (seconds)"
+drive_time(o_tm.outputs[0])
+o_tb = ont.nodes.new("ShaderNodeMath")
+o_tb.operation = "MULTIPLY"
+ont.links.new(o_tm.outputs[0], o_tb.inputs[0])
+ont.links.new(o_bo.outputs[0], o_tb.inputs[1])
+o_sd = ont.nodes.new("ShaderNodeMath")
+o_sd.operation = "FLOOR"
+ont.links.new(o_tb.outputs[0], o_sd.inputs[0])
+o_sv = ont.nodes.new("ShaderNodeVectorMath")
+o_sv.operation = "MULTIPLY"
+ont.links.new(o_sd.outputs[0], o_sv.inputs[0])
+o_sv.inputs[1].default_value = (0.1031, 0.1030, 0.0973)
+o_sf = ont.nodes.new("ShaderNodeVectorMath")
+o_sf.operation = "FRACTION"
+ont.links.new(o_sv.outputs[0], o_sf.inputs[0])
+o_ss = ont.nodes.new("ShaderNodeVectorMath")
+o_ss.operation = "SCALE"
+ont.links.new(o_sf.outputs[0], o_ss.inputs[0])
+S(o_ss.inputs, "Scale").default_value = 37.0
+o_q = ont.nodes.new("ShaderNodeVectorMath")
+o_q.operation = "ADD"
+ont.links.new(o_tc.outputs["Object"], o_q.inputs[0])
+ont.links.new(o_ss.outputs[0], o_q.inputs[1])
+ont.links.new(o_q.outputs[0], S(o_nz.inputs, "Vector"))
 o_bk = ont.nodes.new("ShaderNodeValue")
 o_bk.label = "Outline Breakup"
 o_bk.outputs[0].default_value = ${bvv}
@@ -59,7 +99,42 @@ o_hide2 = ont.nodes.new("ShaderNodeMath")
 o_hide2.operation = "MAXIMUM"
 ont.links.new(o_hide.outputs[0], o_hide2.inputs[0])
 ont.links.new(o_cam.outputs[0], o_hide2.inputs[1])
-${o.rings ? `# loose offset lines: thin rings across the halo, each wobbling on its own
+# offset: leave a gap between the surface and the line (measured as if the shape were round, using the object's size)
+o_off = ont.nodes.new("ShaderNodeValue")
+o_off.label = "Outline Offset"
+o_off.outputs[0].default_value = ${fvv}
+o_wd = ont.nodes.new("ShaderNodeValue")
+o_wd.label = "Outline Width"
+o_wd.outputs[0].default_value = ${wv}
+o_sz = ont.nodes.new("ShaderNodeAttribute")
+o_sz.attribute_type = "OBJECT"
+o_sz.attribute_name = "inoscula_object_size"
+def o_math(op, a, b):
+    n = ont.nodes.new("ShaderNodeMath")
+    n.operation = op
+    for i, x in enumerate((a, b)):
+        if isinstance(x, (int, float)):
+            n.inputs[i].default_value = x
+        else:
+            ont.links.new(x, n.inputs[i])
+    return n.outputs[0]
+o_has = o_math("GREATER_THAN", o_sz.outputs["Fac"], 0.0001)
+o_r = o_math("MULTIPLY", o_math("ADD", o_math("MULTIPLY", o_sz.outputs["Fac"], o_has), o_math("MULTIPLY", o_math("SUBTRACT", 1.0, o_has), 2.0)), 0.5)
+o_a = o_math("ADD", o_r, o_off.outputs[0])
+o_k = o_math("DIVIDE", o_a, o_math("ADD", o_a, o_wd.outputs[0]))
+o_keep = o_math("SQRT", o_math("MAXIMUM", o_math("SUBTRACT", 1.0, o_math("MULTIPLY", o_k, o_k)), 0.0), 0.0)
+o_gd = ont.nodes.new("ShaderNodeVectorMath")
+o_gd.operation = "DOT_PRODUCT"
+ont.links.new(o_geo.outputs["Normal"], o_gd.inputs[0])
+ont.links.new(o_geo.outputs["Incoming"], o_gd.inputs[1])
+o_gface = o_math("ABSOLUTE", S(o_gd.outputs, "Value"), 0.0)
+o_gap = o_math("MULTIPLY", o_math("GREATER_THAN", o_gface, o_keep), o_math("GREATER_THAN", o_off.outputs[0], 0.0))
+o_hideg = ont.nodes.new("ShaderNodeMath")
+o_hideg.operation = "MAXIMUM"
+ont.links.new(o_hide2.outputs[0], o_hideg.inputs[0])
+ont.links.new(o_gap, o_hideg.inputs[1])
+o_hide2 = o_hideg
+${follow('o_off', fl)}${follow('o_wd', wl)}${follow('o_bo', ol)}${o.rings ? `# loose offset lines: thin rings across the halo, each wobbling on its own
 o_dot = ont.nodes.new("ShaderNodeVectorMath")
 o_dot.operation = "DOT_PRODUCT"
 ont.links.new(o_geo.outputs["Normal"], o_dot.inputs[0])
@@ -79,7 +154,7 @@ if hasattr(o_rn, "normalize"):
     o_rn.normalize = True
 for k, val in (("Scale", 3.0), ("Detail", 1.0), ("Roughness", 0.5), ("Lacunarity", 2.0), ("Distortion", 0.0)):
     S(o_rn.inputs, k).default_value = val
-ont.links.new(o_tc.outputs["Object"], S(o_rn.inputs, "Vector"))
+ont.links.new(o_q.outputs[0], S(o_rn.inputs, "Vector"))
 o_rw = ont.nodes.new("ShaderNodeMath")
 o_rw.operation = "MULTIPLY_ADD"
 ont.links.new(S(o_rn.outputs, "Fac"), o_rw.inputs[0])
@@ -142,16 +217,20 @@ for ob in targets:
     mod.use_flip_normals = True
     mod.use_rim = False
     mod.offset = 1.0
-    mod.thickness = ${wv}
+    mod.thickness = ${wv} + ${fvv}
+    ob["inoscula_object_size"] = ob.dimensions.length
     mod.material_offset = [s.material.name if s.material else "" for s in ob.material_slots].index(om.name)
-${wl ? `    d = mod.driver_add("thickness").driver
-    d.type = "AVERAGE"
-    v = d.variables.new()
+${wl || fl ? `    # the shell is pushed out by the width plus the offset
+    d = mod.driver_add("thickness").driver
+    d.type = "SCRIPTED"
+    d.expression = ${py(`${wl ? 'w' : wv} + ${fl ? 'o' : fvv}`)}
+${[[wl, 'w'], [fl, 'o']].filter(([lab]) => lab).map(([lab, nm]) => `    v = d.variables.new()
+    v.name = "${nm}"
     v.type = "SINGLE_PROP"
     v.targets[0].id_type = "MATERIAL"
     v.targets[0].id = m
-    v.targets[0].data_path = 'node_tree.nodes["%s"].inputs["%s"].default_value' % (gn.name, ${py(wl)})
-    # a width of 0 turns the outline off, rather than leaving a shell on the surface
+    v.targets[0].data_path = 'node_tree.nodes["%s"].inputs["%s"].default_value' % (gn.name, ${py(lab!)})
+`).join('')}` : ''}${wl ? `    # a width of 0 turns the outline off, rather than leaving a shell on the surface
     for prop in ("show_render", "show_viewport"):
         d = mod.driver_add(prop).driver
         d.type = "SCRIPTED"
@@ -190,7 +269,7 @@ export function toBlender(ir: IR): string {
     srcSock.time = 'tm.outputs[0]'
   }
   if (need('curvature') || need('occlusion')) {
-    // shape data lives in the mesh's colour attribute (red curvature, green occlusion)
+    // shape data lives in the mesh's color attribute (red curvature, green occlusion)
     L(`shape = node("ShaderNodeVertexColor", -400, -450)`)
     L(`shape.label = "Shape data (curvature, occlusion)"`)
     L(`shape_xyz = node("ShaderNodeSeparateXYZ", -200, -450)`)
@@ -283,6 +362,7 @@ export function toBlender(ir: IR): string {
       case 'pow': if (!v) math('POWER', [0, 1]); else perComp('POWER', 2); break
       case 'exp': if (!v) math('EXPONENT', [0]); else perComp('EXPONENT', 1); break
       case 'sqrt': if (!v) math('SQRT', [0]); else perComp('SQRT', 1); break
+      case 'log': math('LOGARITHM', [0]); L(`${id}.inputs[1].default_value = ${Math.E}`); break
       case 'atan2': math('ARCTAN2', [0, 1]); break
       case 'white_noise':
         L(`${id} = node("ShaderNodeTexWhiteNoise", ${x}, ${y})`); L(`${id}.noise_dimensions = "3D"`)
@@ -364,6 +444,8 @@ export function toBlender(ir: IR): string {
     ...(ir.layers.sheen ? [['Sheen', 'NodeSocketFloat', ir.layers.sheen, '0.0'], ['Sheen Tint', 'NodeSocketColor', ir.layers.sheen_color, '(1.0, 1.0, 1.0, 1.0)'], ['Sheen Roughness', 'NodeSocketFloat', ir.layers.sheen_roughness, '0.5']] as [string, string, Arg | null, string][] : []),
     ...(ir.layers.subsurface ? [['Subsurface', 'NodeSocketFloat', ir.layers.subsurface, '0.0']] as [string, string, Arg | null, string][] : []),
   ] : []
+  // glass goes out of the group too, for the refraction mix in the material
+  if (ir.glass) litOuts.push(['Glass', 'NodeSocketFloat', ir.glass.amount, '0.0'], ['Glass IOR', 'NodeSocketFloat', ir.glass.ior, '1.45'], ['Glass Dispersion', 'NodeSocketFloat', ir.glass.dispersion, '0.0'])
   // the group input label behind a parameter wire (for drivers), or null for a fixed value
   const outLabel = (a: Arg) => { if (a.k !== 'ref' || !a.id.startsWith('p_')) return null; const p = ir.params.find((q) => 'p_' + q.id === a.id); return p ? (p.label ?? p.id) : null }
   const outLine = (nm: string, a: Arg | null, fallback: string, isColor: boolean) => {
@@ -375,7 +457,7 @@ export function toBlender(ir: IR): string {
 
   const params = ir.params.map((p) => {
     const nm = py(p.label ?? p.id)
-    if (p.t === 'float') return `sock_in(${nm}, "NodeSocketFloat", ${pyNum(p.default as number)}, ${p.min ?? 'None'}, ${p.max ?? 'None'})`
+    if (p.t === 'float') return `sock_in(${nm}, "NodeSocketFloat", ${pyNum(p.default as number)}, ${p.min ?? 'None'}, ${p.max ?? 'None'}${paramDesc(p) ? ', ' + py(paramDesc(p)) : ''})`
     const v = p.default as number[]
     return p.type === 'color'
       ? `sock_in(${nm}, "NodeSocketColor", (${v.map(pyNum).join(', ')}, 1.0))`
@@ -407,8 +489,8 @@ g.nodes.clear()
 for item in list(g.interface.items_tree):
     g.interface.remove(item)
 
-def sock_in(name, kind, default, lo=None, hi=None):
-    s = g.interface.new_socket(name, in_out="INPUT", socket_type=kind)
+def sock_in(name, kind, default, lo=None, hi=None, tip=None):
+    s = g.interface.new_socket(name, in_out="INPUT", socket_type=kind, description=tip or "")
     s.default_value = default
     if lo is not None:
         s.min_value = lo
@@ -549,7 +631,17 @@ for attr, val in (("blend_method", "CLIP"), ("surface_render_method", "DITHERED"
         setattr(m, attr, val)
     except Exception:
         pass
-` : ''}${ir.outline ? blenderOutline(ir, outLabel) : ''}
+` : ''}${ir.glass ? BLENDER_GLASS : ''}
+# ---- put the material on the selected objects, in place of what they had (Ctrl+Z takes it off)
+for ob in bpy.context.selected_objects:
+    if ob.type != "MESH":
+        continue
+    if not ob.material_slots:
+        ob.data.materials.append(m)
+    for sl in ob.material_slots:
+        if not (sl.material and sl.material.name.startswith(MAT + " Outline")):
+            sl.material = m
+${ir.outline ? blenderOutline(ir, outLabel) : ''}
 # ---- light bridge: follow a sun called "RICO Sun", or the first sun in the file
 sun = bpy.data.objects.get("RICO Sun") or next((o for o in bpy.data.objects if o.type == "LIGHT" and o.data.type == "SUN"), None)
 if sun is not None:
@@ -585,3 +677,58 @@ for o in bpy.data.objects:
 ` : ''}print("Inoscula: built material " + MAT)
 `
 }
+
+// Glass: the surface mixed with refraction by the glass amount. Three Refraction BSDFs, tinted red, green and blue,
+// each with its IOR spread by the dispersion the same way the other tools spread their offsets, add up to white
+// glass that splits at the edges. Cycles refracts as it is; Eevee needs raytraced refraction, turned on below.
+const BLENDER_GLASS = `# ---- glass: refraction behind the surface, split into red, green and blue by the dispersion
+srf = out.inputs["Surface"].links[0].from_socket
+g_mx = nt.nodes.new("ShaderNodeMixShader")
+g_mx.location = (900, 0)
+out.location = (1100, 0)
+nt.links.new(gn.outputs["Glass"], g_mx.inputs[0])
+nt.links.new(srf, g_mx.inputs[1])
+g_less = nt.nodes.new("ShaderNodeMath")
+g_less.operation = "SUBTRACT"
+g_less.location = (300, -500)
+nt.links.new(gn.outputs["Glass IOR"], g_less.inputs[0])
+g_less.inputs[1].default_value = 1.0
+g_sum = None
+for i, tint in enumerate(((1.0, 0.0, 0.0, 1.0), (0.0, 1.0, 0.0, 1.0), (0.0, 0.0, 1.0, 1.0))):
+    k = nt.nodes.new("ShaderNodeMath")
+    k.operation = "MULTIPLY_ADD"
+    k.location = (300, -650 - i * 160)
+    nt.links.new(gn.outputs["Glass Dispersion"], k.inputs[0])
+    k.inputs[1].default_value = 0.5 * (i - 1)
+    k.inputs[2].default_value = 1.0
+    ior = nt.nodes.new("ShaderNodeMath")
+    ior.operation = "MULTIPLY_ADD"
+    ior.location = (480, -650 - i * 160)
+    nt.links.new(g_less.outputs[0], ior.inputs[0])
+    nt.links.new(k.outputs[0], ior.inputs[1])
+    ior.inputs[2].default_value = 1.0
+    rf = nt.nodes.new("ShaderNodeBsdfRefraction")
+    rf.location = (650, -650 - i * 160)
+    rf.inputs["Color"].default_value = tint
+    rf.inputs["Roughness"].default_value = 0.0
+    nt.links.new(ior.outputs[0], rf.inputs["IOR"])
+    if g_sum is None:
+        g_sum = rf.outputs[0]
+    else:
+        ad = nt.nodes.new("ShaderNodeAddShader")
+        ad.location = (800, -650 - i * 160)
+        nt.links.new(g_sum, ad.inputs[0])
+        nt.links.new(rf.outputs[0], ad.inputs[1])
+        g_sum = ad.outputs[0]
+nt.links.new(g_sum, g_mx.inputs[2])
+nt.links.new(g_mx.outputs[0], out.inputs["Surface"])
+# Eevee only refracts other objects with raytraced refraction on (Blender 4.2 and later), or screen space
+# refraction (earlier versions)
+for attr in ("use_raytrace_refraction", "use_screen_refraction"):
+    if hasattr(m, attr):
+        setattr(m, attr, True)
+if hasattr(bpy.context.scene, "eevee"):
+    for attr in ("use_raytracing", "use_ssr", "use_ssr_refraction"):
+        if hasattr(bpy.context.scene.eevee, attr):
+            setattr(bpy.context.scene.eevee, attr, True)
+`

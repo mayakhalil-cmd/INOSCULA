@@ -99,7 +99,7 @@ void inoscula_voronoi(vec3 p, float scale, float randomness, out float dist, out
   }
   dist = md;
   col = inoscula_cellhash(cx + tx, cy + ty, cz + tz);
-  pos = inoscula_div_v(tp + cf, vec3(scale));
+  pos = inoscula_div_v(tp + cf, vec3(scale, scale, scale));
 }
 `
 // Surface bumps from a height value, using screen derivatives (the same method as Blender's Bump node).
@@ -173,13 +173,41 @@ float inoscula_noise(vec3 p, float scale, float detail, float roughness, float l
 }
 `
 
-function translate(src: string, L: Lang) {
-  if (L.d !== 'hlsl') return src
-  return src.replace(/\bdFdx\(/g, 'ddx(').replace(/\bdFdy\(/g, 'ddy(').replace(/\bfloatBitsToUint\(/g, 'asuint(').replace(/\bvec3\(0\.0\)/g, '((float3)0.0)').replace(/\bvec3\b/g, 'float3').replace(/\bmix\(/g, 'lerp(').replace(/\bfract\(/g, 'frac(')
+// GLSL lets vec3(x) fill all three parts from one number. HLSL compilers before DXC accepted float3(x) too, but
+// DXC (Unreal 5 on SM6, newer Unity) rejects it, so every one-argument float2/3/4(...) is rewritten as a cast.
+export function hlslSplats(src: string): string {
+  const re = /\bfloat([234])\(/g
+  let out = ''
+  let last = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(src))) {
+    let depth = 1
+    let commas = 0
+    let i = m.index + m[0].length
+    for (; i < src.length && depth > 0; i++) {
+      const c = src[i]
+      if (c === '(') depth++
+      else if (c === ')') depth--
+      else if (c === ',' && depth === 1) commas++
+    }
+    if (depth !== 0) break
+    const inner = src.slice(m.index + m[0].length, i - 1)
+    if (commas === 0 && inner.trim() !== '') {
+      out += src.slice(last, m.index) + `((float${m[1]})(${hlslSplats(inner)}))`
+      last = i
+      re.lastIndex = i
+    }
+  }
+  return out + src.slice(last)
 }
 
-// Blender does not evaluate a colour ramp directly: it samples it into a 257 entry table (steps of 1/256) and reads that
-// (stepping for Constant, blending neighbours for Linear). Doing the same here makes band edges land on exactly
+function translate(src: string, L: Lang) {
+  if (L.d !== 'hlsl') return src
+  return hlslSplats(src.replace(/\bdFdx\(/g, 'ddx(').replace(/\bdFdy\(/g, 'ddy(').replace(/\bfloatBitsToUint\(/g, 'asuint(').replace(/\bvec3\(0\.0\)/g, '((float3)0.0)').replace(/\bvec3\b/g, 'float3').replace(/\bmix\(/g, 'lerp(').replace(/\bfract\(/g, 'frac('))
+}
+
+// Blender does not evaluate a color ramp directly: it samples it into a 257 entry table (steps of 1/256) and reads that
+// (stepping for Constant, blending neighbors for Linear). Doing the same here makes band edges land on exactly
 // the same pixels as in Blender instead of up to 1/255 away.
 function rampFn(L: Lang, s: Step) {
   const exact = rampExact(L, s)
@@ -243,7 +271,7 @@ export function body(ir: IR, L: Lang, indent = '  ') {
     if (/_(x|y|z)$/.test(a.id)) return 'float'
     return stepType.get(a.id) ?? stepType.get(a.id.replace(/_(out|color|position)$/, '')) ?? ir.params.find((p) => 'p_' + p.id === a.id)?.t ?? a.type
   }
-  const AV = (s: Step, i: number) => (s.type === 'vec3' && realType(s.args[i]) === 'float' ? `${L.ty('vec3')}(${A(s, i)})` : A(s, i))
+  const AV = (s: Step, i: number) => (s.type === 'vec3' && realType(s.args[i]) === 'float' ? L.splat(A(s, i)) : A(s, i))
   for (const s of ir.steps) {
     const t = L.ty(s.type)
     const v = s.type === 'vec3'
@@ -255,20 +283,21 @@ export function body(ir: IR, L: Lang, indent = '  ') {
       case 'mul': e = `${A(s, 0)} * ${A(s, 1)}`; break
       case 'div': e = `inoscula_div_${v ? 'v' : 'f'}(${AV(s, 0)}, ${AV(s, 1)})`; break
       case 'pow': e = `inoscula_pow_${v ? 'v' : 'f'}(${AV(s, 0)}, ${AV(s, 1)})`; break
-      case 'min': e = `min(${A(s, 0)}, ${A(s, 1)})`; break
-      case 'max': e = `max(${A(s, 0)}, ${A(s, 1)})`; break
-      case 'clamp': e = `min(max(${A(s, 0)}, ${A(s, 1)}), ${A(s, 2)})`; break
+      case 'min': e = `min(${AV(s, 0)}, ${AV(s, 1)})`; break
+      case 'max': e = `max(${AV(s, 0)}, ${AV(s, 1)})`; break
+      case 'clamp': e = `min(max(${AV(s, 0)}, ${AV(s, 1)}), ${AV(s, 2)})`; break
       case 'abs': e = `abs(${A(s, 0)})`; break
       case 'floor': e = `floor(${A(s, 0)})`; break
       case 'fract': e = `${A(s, 0)} - floor(${A(s, 0)})`; break
       case 'sin': e = `sin(${A(s, 0)})`; break
       case 'cos': e = `cos(${A(s, 0)})`; break
       case 'exp': e = `exp(${A(s, 0)})`; break
+      case 'log': e = `(${A(s, 0)} > 0.0 ? log(${A(s, 0)}) : 0.0)`; break
       case 'sqrt': e = `inoscula_sqrt_${v ? 'v' : 'f'}(${A(s, 0)})`; break
       case 'atan2': e = L.d === 'hlsl' ? `atan2(${A(s, 0)}, ${A(s, 1)})` : `atan(${A(s, 0)}, ${A(s, 1)})`; break
       case 'white_noise': e = `inoscula_white(${A(s, 0)})`; break
       case 'one_minus': e = `${v ? L.splat('1.0') : '1.0'} - ${A(s, 0)}`; break
-      case 'mix': e = `${L.mix}(${A(s, 0)}, ${A(s, 1)}, clamp(${A(s, 2)}, 0.0, 1.0))`; break
+      case 'mix': e = `${L.mix}(${AV(s, 0)}, ${AV(s, 1)}, clamp(${A(s, 2)}, 0.0, 1.0))`; break
       case 'smoothstep': e = `smoothstep(${A(s, 0)}, ${A(s, 1)}, ${A(s, 2)})`; break
       case 'greater': e = `(${A(s, 0)} > ${A(s, 1)} ? 1.0 : 0.0)`; break
       case 'dot': e = `dot(${A(s, 0)}, ${A(s, 1)})`; break
@@ -305,6 +334,11 @@ export function body(ir: IR, L: Lang, indent = '  ') {
   out.push(`${indent}${L.vec3} g_out_sheen_color = ${ly?.sheen_color ? argStr(L, ly.sheen_color) : L.splat('1.0')};`)
   out.push(`${indent}float g_out_sheen_rough = ${ly?.sheen_roughness ? argStr(L, ly.sheen_roughness) : '0.5'};`)
   out.push(`${indent}float g_out_sss = ${ly?.subsurface ? argStr(L, ly.subsurface) : '0.0'};`)
+  if (ir.glass) {
+    out.push(`${indent}float g_out_glass = clamp(${argStr(L, ir.glass.amount)}, 0.0, 1.0);`)
+    out.push(`${indent}float g_out_ior = ${argStr(L, ir.glass.ior)};`)
+    out.push(`${indent}float g_out_disp = ${argStr(L, ir.glass.dispersion)};`)
+  }
   return out.join('\n')
 }
 

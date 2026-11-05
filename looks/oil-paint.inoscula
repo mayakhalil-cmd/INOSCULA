@@ -12,11 +12,11 @@ uniform vec3 hotPaint = vec3(1.0, 0.85, 0.68);      // @color @label Highlight
 uniform vec3 shadowAccent = vec3(0.04, 0.13, 0.2);  // @color @label Shadow Accent
 uniform vec3 midAccent = vec3(0.32, 0.06, 0.2);        // @color @label Mid Accent
 uniform vec3 lightAccent = vec3(0.95, 0.5, 0.35);    // @color @label Light Accent
-uniform vec3 sheenA = vec3(0.2, 0.55, 0.75);          // @color @label Sheen Colour A
-uniform vec3 sheenB = vec3(0.85, 0.3, 0.45);          // @color @label Sheen Colour B
-uniform float variety = 0.35;                         // @range 0 1 @label Colour Variety
+uniform vec3 sheenA = vec3(0.2, 0.55, 0.75);          // @color @label Sheen Color A
+uniform vec3 sheenB = vec3(0.85, 0.3, 0.45);          // @color @label Sheen Color B
+uniform float variety = 0.35;                         // @range 0 1 @label Color Variety
 uniform float sheen = 0.45;                           // @range 0 1 @label Sheen
-uniform vec3 swirlCenter = vec3(0.0, 0.0, 0.0);      // @label Swirl Centre (world)
+uniform vec3 swirlCenter = vec3(0.0, 0.0, 0.0);      // @label Swirl Center (world)
 uniform float groundAware = 1.0;                      // @range 0 1 @label Calm Paint On Big Flat Surfaces
 uniform vec3 keyPos = vec3(3.5, 0.8, 3.0);          // @label Key Light Position
 uniform float keyPoint = 0.0;                        // @range 0 1 @label Lights From Positions (0: follow the scene's sun)
@@ -45,7 +45,7 @@ uniform float drift = 0.0;                           // @range 0 1 @label Drift
 uniform float fps = 8.0;                             // @range 0 24 @label Repaint FPS
 uniform float repaint = 0.0;                         // @range 0 1 @label Repaint Amount
 uniform float lineWidth = 0.03;                      // @range 0 0.05 @label Edge Line Width
-uniform vec3 lineColor = vec3(0.013, 0.006, 0.013); // @color @label Edge Line Colour
+uniform vec3 lineColor = vec3(0.013, 0.006, 0.013); // @color @label Edge Line Color
 
 vec3 crossv(vec3 a, vec3 b) {
   return vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);

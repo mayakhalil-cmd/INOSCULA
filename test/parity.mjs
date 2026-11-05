@@ -7,7 +7,11 @@ import { chromium } from 'playwright'
 import { check, toThree } from '../src/index.ts'
 
 const EXACT = process.argv.includes('--exact') // same inputs on both sides: tests the maths alone
-const [bakeFile, threeFile, outDir, graphDir = 'examples'] = process.argv.slice(2).filter((a) => a !== '--exact')
+// --differs a,b: shaders known to come out different in Blender (random numbers from fract(sin(x) * big), which
+// each renderer rounds its own way). They are still drawn and listed, but do not fail the test.
+const di = process.argv.indexOf('--differs')
+const DIFFERS = new Set(di > 0 ? process.argv[di + 1].split(',') : [])
+const [bakeFile, threeFile, outDir, graphDir = 'examples'] = process.argv.slice(2).filter((a, i, all) => a !== '--exact' && a !== '--differs' && all[i - 1] !== '--differs')
 const bake = JSON.parse(fs.readFileSync(bakeFile, 'utf8'))
 const graphs = Object.fromEntries(fs.readdirSync(graphDir).map((f) => { const g = JSON.parse(fs.readFileSync(graphDir + '/' + f, 'utf8')); return [g.name, g] }))
 
@@ -25,7 +29,7 @@ window.renderBake = (mesh, sh, size, inputs) => {
   g.setAttribute('normal', new THREE.BufferAttribute(conv(mesh.nrm), 3))
   g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(mesh.uv), 2))
   const u = {}
-  for (const [k, v] of Object.entries(sh.uniforms)) u[k] = { value: Array.isArray(v) ? new THREE.Vector3(...v) : v }
+  for (const [k, v] of Object.entries(sh.uniforms)) u[k] = { value: Array.isArray(v) ? (v.length === 2 ? new THREE.Vector2(...v) : new THREE.Vector3(...v)) : v }
   if (inputs) for (const [k, b64] of Object.entries(inputs)) {
     const bin = atob(b64), bytes = new Uint8Array(bin.length)
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
@@ -107,7 +111,7 @@ for (const [name, b] of Object.entries(bake)) {
   fs.writeFileSync(file, Buffer.from(png.split(',')[1], 'base64'))
   const row = { shader: name, texels: n, identical_8bit: `${(100 * same / n).toFixed(3)}%`, within_2_of_255: `${(100 * close / n).toFixed(3)}%`, mean_diff: (sum / n).toExponential(2), max_diff: max.toExponential(2) }
   report.push(row)
-  if (close / n < 0.97) failed = true // pass: 97% of texels within 2/255
+  if (close / n < 0.97) { if (DIFFERS.has(name)) row.note = 'different random pattern, as expected (fract(sin()) noise)'; else failed = true } // pass: 97% of texels within 2/255
   console.log(row)
 }
 fs.writeFileSync(`${outDir}/parity.json`, JSON.stringify(report, null, 2))

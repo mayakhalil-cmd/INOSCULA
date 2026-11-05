@@ -8,16 +8,20 @@ export interface GIn { n: string; t: SockType; v?: unknown; hide?: boolean; noso
 export interface GNode {
   id: string; title: string; cat: string; ins: GIn[]; outs: { n: string; t: SockType }[]
   line?: number; note?: string; extra?: 'ramp'; stops?: [number, number[]][]; sink?: boolean | number; col?: number
+  /** a color swatch, as Unreal draws on its color constants and parameters */
+  swatch?: number[]
+  /** where the layout put it, and its size */
+  x?: number; y?: number; w?: number; h?: number
 }
 export interface GLink { a: string; ao: number; b: string; bi: number }
-export interface NodeView { nodes: GNode[]; links: GLink[]; theme: string; legend?: string }
+export interface NodeView { nodes: GNode[]; links: GLink[]; theme: string; legend?: string; side?: boolean; laid?: boolean }
 
 const baseOf = (id: string) => id.replace(/_(x|y|z|color|position)$/, '')
 const outIdx = (id: string) => ({ x: 0, y: 1, z: 2, color: 1, position: 2 } as Record<string, number>)[/_(x|y|z|color|position)$/.exec(id)?.[1] ?? ''] ?? 0
 const ty = (t: string): SockType => (t === 'vec3' ? 'vec3' : 'float')
 
 // ------------------------------------------------------------------ Inoscula's own graph
-const SOURCE_TITLE: Record<string, string> = { uv: 'UV', object_pos: 'Object Position', object_normal: 'Object Normal', world_pos: 'World Position', normal: 'Normal', view_dir: 'View Direction', time: 'Time', light_dir: 'Light Direction', light_color: 'Light Colour', curvature: 'Curvature', occlusion: 'Occlusion', object_size: 'Object Size' }
+const SOURCE_TITLE: Record<string, string> = { uv: 'UV', object_pos: 'Object Position', object_normal: 'Object Normal', world_pos: 'World Position', normal: 'Normal', view_dir: 'View Direction', time: 'Time', light_dir: 'Light Direction', light_color: 'Light Color', curvature: 'Curvature', occlusion: 'Occlusion', object_size: 'Object Size' }
 export function inosculaView(ir: IR, lines?: Map<string, number>): NodeView {
   const nodes: GNode[] = [], links: GLink[] = []
   const have = new Set<string>()
@@ -26,7 +30,7 @@ export function inosculaView(ir: IR, lines?: Map<string, number>): NodeView {
     have.add(id)
     if (id.startsWith('p_')) {
       const p = ir.params.find((q) => 'p_' + q.id === id)
-      nodes.push({ id, title: p?.label ?? id.slice(2), cat: 'param', ins: [], outs: [{ n: p?.type === 'color' ? 'colour' : 'value', t: p?.t === 'vec3' ? (p.type === 'color' ? 'color' : 'vec3') : 'float' }], note: p ? `parameter ${p.id}` : undefined })
+      nodes.push({ id, title: p?.label ?? id.slice(2), cat: 'param', ins: [], outs: [{ n: p?.type === 'color' ? 'color' : 'value', t: p?.t === 'vec3' ? (p.type === 'color' ? 'color' : 'vec3') : 'float' }], note: p ? `parameter ${p.id}` : undefined })
     }
   }
   const wire = (a: Arg, to: string, bi: number) => {
@@ -49,7 +53,7 @@ export function inosculaView(ir: IR, lines?: Map<string, number>): NodeView {
     have.add(s.id)
     s.args.forEach((a, i) => wire(a, s.id, i))
   }
-  const outs: [string, Arg | null][] = [['colour', ir.color], ['alpha', ir.alpha], ...(ir.lit ? [['roughness', ir.roughness], ['metallic', ir.metallic], ['bump', ir.bump], ['emission', ir.emission], ...Object.entries(ir.layers)] as [string, Arg | null][] : []), ...(ir.outline ? [['outline', ir.outline.width], ['outline colour', ir.outline.color], ['outline breakup', ir.outline.breakup]] as [string, Arg][] : [])]
+  const outs: [string, Arg | null][] = [['color', ir.color], ['alpha', ir.alpha], ...(ir.lit ? [['roughness', ir.roughness], ['metallic', ir.metallic], ['bump', ir.bump], ['emission', ir.emission], ...Object.entries(ir.layers)] as [string, Arg | null][] : []), ...(ir.outline ? [['outline', ir.outline.width], ['outline color', ir.outline.color], ['outline breakup', ir.outline.breakup]] as [string, Arg][] : [])]
   const used = outs.filter(([, a]) => a)
   nodes.push({ id: '__out', title: ir.lit ? 'surface (lit)' : 'surface (unlit)', cat: 'output', sink: true, outs: [], ins: used.map(([n, a]) => ({ n, t: a!.type === 'vec3' ? 'vec3' : 'float', v: a!.k === 'lit' ? a!.v : undefined })) })
   used.forEach(([, a], i) => wire(a!, '__out', i))
@@ -188,7 +192,7 @@ export function blenderView(ir: IR, scriptIn?: string): NodeView {
     if (n.kind === 'ShaderNodeValue') ins.push({ n: '', t: 'float', v: n.vals.get('__value') ?? 0, nosock: true })
     if (n.kind === 'ShaderNodeAttribute') ins.push({ n: 'Name', t: 'float', v: 'inoscula_object_size', nosock: true })
     if (n.kind === 'ShaderNodeNewGeometry' || n.kind === 'ShaderNodeTexCoord') {
-      // Blender shows every output; keep the ones in use plus their neighbours readable
+      // Blender shows every output; keep the ones in use plus their neighbors readable
     }
     nodes.push({ id, title: v.title, cat: n.spec.cat, ins, outs: v.outs.map((x) => ({ n: x.nm, t: x.t })), note: n.note ?? (n.kind === 'ShaderNodeTexNoise' ? '3D · fBM · Normalize' : n.kind === 'ShaderNodeTexVoronoi' ? '3D · F1 · Euclidean' : n.kind === 'ShaderNodeMix' && n.props.data_type === 'VECTOR' ? 'Vector · Uniform · Clamp Factor' : n.kind === 'ShaderNodeMix' ? 'Float · Clamp Factor' : n.kind === 'ShaderNodeMapRange' ? 'Smooth Step · Clamp' : n.kind === 'ShaderNodeValToRGB' ? (n.props.interpolation === 'CONSTANT' ? 'Constant' : 'Linear') : undefined),
       ...(n.stops ? { extra: 'ramp' as const, stops: n.stops } : {}) })
@@ -232,4 +236,61 @@ export function blenderMaterialView(ir: IR): NodeView {
     links.push({ a: last, ao: 0, b: 'out', bi: 0 })
   }
   return { nodes, links, theme: 'blender', legend: `Blender · Shader Editor · the material "${ir.name}". Select the group node and press Tab to go inside.` }
+}
+
+// ------------------------------------------------------------------ one layout for the node view and the exports
+// Columns: each node sits one column right of the furthest node that feeds it, outputs in the last column, and each
+// column is ordered by where its inputs come from so wires cross less. Sizes are in the node view's pixels, which are
+// also Unreal's graph units, so the Unreal script places every expression where the Nodes tab draws it.
+// side: inputs and outputs on the same rows (Unreal, Godot, Unity) or stacked, outputs first (Blender, Inoscula).
+export const NODE_ROW = 20, NODE_HEAD = 24
+const charW = 6.95, boldW = 7.6
+export function nodeSize(n: GNode, side: boolean): { w: number; h: number } {
+  const vis = n.ins.filter((i) => !i.hide)
+  const fmt = (v: unknown) => Array.isArray(v) ? v.map((x) => +(+x).toFixed(2)).join(', ') : typeof v === 'number' ? String(+v.toFixed(3)) : String(v)
+  const inW = Math.max(0, ...vis.map((i) => i.n.length * charW + (i.v !== undefined ? fmt(i.v).length * charW + 16 : 0)))
+  const outW = Math.max(0, ...n.outs.map((o) => o.n.length * charW))
+  const swatch = n.swatch ? 1 : 0
+  const w = Math.ceil(Math.max(side ? 96 : 120, n.title.length * boldW + 26, side ? inW + outW + 46 + swatch * 52 : Math.max(inW, outW) + 34, n.extra ? 150 : 0, n.note ? Math.min(240, n.note.length * charW + 20) : 0))
+  const rows = side ? Math.max(vis.length, n.outs.length, swatch ? 3 : 0) : vis.length + n.outs.length
+  const h = NODE_HEAD + rows * NODE_ROW + (n.extra ? 22 : 0) + (n.note ? 18 : 0) + 8
+  return { w, h }
+}
+export function layoutNodes(G: { nodes: GNode[]; links: GLink[] }, side = false, gapX = 70, gapY = 18) {
+  const byId = new Map(G.nodes.map((n) => [n.id, n]))
+  const feeds = new Map(G.nodes.map((n) => [n.id, [] as string[]]))
+  for (const l of G.links) if (byId.has(l.a) && byId.has(l.b)) feeds.get(l.b)!.push(l.a)
+  const col = new Map<string, number>()
+  const colOf = (id: string, seen = new Set<string>()): number => {
+    if (col.has(id)) return col.get(id)!
+    if (seen.has(id)) return 0
+    seen.add(id)
+    const n = byId.get(id)!
+    const c = n.col ?? Math.max(-1, ...feeds.get(id)!.map((f) => colOf(f, seen))) + 1
+    col.set(id, c); return c
+  }
+  G.nodes.forEach((n) => colOf(n.id))
+  // inputs, parameters and constants sit just left of the first node that uses them, not all at the far left
+  const uses = new Map<string, number[]>()
+  for (const l of G.links) if (byId.has(l.a) && byId.has(l.b)) (uses.get(l.a) ?? uses.set(l.a, []).get(l.a)!).push(col.get(l.b)!)
+  for (const n of G.nodes) if (n.col === undefined && !n.sink && !feeds.get(n.id)!.length && uses.has(n.id)) col.set(n.id, Math.max(0, Math.min(...uses.get(n.id)!) - 1))
+  const last = Math.max(0, ...col.values())
+  for (const n of G.nodes) if (n.sink) col.set(n.id, last + (n.sink === true ? 0 : n.sink) + (G.nodes.some((m) => !m.sink && col.get(m.id) === last) ? 1 : 0))
+  for (const n of G.nodes) Object.assign(n, nodeSize(n, side))
+  const cols: GNode[][] = []
+  for (const n of G.nodes) (cols[col.get(n.id)!] ??= []).push(n)
+  let x = 0
+  const cy = new Map<string, number>()
+  for (const c of cols) {
+    if (!c) continue
+    const k = new Map(c.map((n) => { const f = feeds.get(n.id)!.map((id) => cy.get(id)).filter((v) => v !== undefined) as number[]; return [n.id, f.length ? f.reduce((a, b) => a + b, 0) / f.length : 0] }))
+    c.sort((a, b) => k.get(a.id)! - k.get(b.id)!)
+    const w = Math.max(...c.map((n) => n.w!))
+    let y = 0
+    for (const n of c) { n.x = x; n.y = y; y += n.h! + gapY }
+    // each column is centered on the same line, so the graph reads left to right without drifting downwards
+    for (const n of c) { n.y! -= Math.round((y - gapY) / 2); cy.set(n.id, n.y! + n.h! / 2) }
+    x += w + gapX
+  }
+  return G
 }

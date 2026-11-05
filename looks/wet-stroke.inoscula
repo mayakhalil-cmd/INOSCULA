@@ -13,15 +13,15 @@ uniform float toneCount = 3.0;                       // @range 2 3 @label Tones 
 uniform float toneSplit = 0.5;                       // @range 0 1 @label Undertone and Overtone Mix
 uniform float toonLow = 0.12;                        // @range -1 1 @label Shadow Edge
 uniform float toonHigh = 0.55;                       // @range -1 1 @label Light Edge
-uniform vec3 reflectA = vec3(0.95, 0.2, 0.55);      // @color @label Reflection Colour A
-uniform vec3 reflectB = vec3(1.0, 0.62, 0.2);       // @color @label Reflection Colour B
+uniform vec3 reflectA = vec3(0.95, 0.2, 0.55);      // @color @label Reflection Color A
+uniform vec3 reflectB = vec3(1.0, 0.62, 0.2);       // @color @label Reflection Color B
 uniform float reflectStart = 0.25;                   // @range -1 1 @label Reflection Start
 uniform float reflectAmount = 0.9;                   // @range 0 1 @label Reflection Amount
 uniform vec3 sheenA = vec3(0.35, 0.15, 0.85);       // @color @label Sheen Violet
 uniform vec3 sheenB = vec3(1.0, 0.3, 0.6);          // @color @label Sheen Pink
 uniform vec3 sheenC = vec3(1.0, 0.55, 0.15);        // @color @label Sheen Orange
 uniform float sheen = 0.7;                           // @range 0 1 @label Sheen
-uniform float lightTint = 0.6;                       // @range 0 1 @label Takes The Light Colour
+uniform float lightTint = 0.6;                       // @range 0 1 @label Takes The Light Color
 uniform float strokeSize = 2.4;                      // @range 0.5 10 @label Stroke Density
 uniform float strokeLength = 3.2;                    // @range 1 8 @label Stroke Length
 uniform float combing = 1.6;                         // @range 0 4 @label Dragged Edges
@@ -34,7 +34,7 @@ uniform float aoStrength = 0.8;                      // @range 0 1 @label Occlus
 uniform float erosion = 0.55;                        // @range 0 1 @label Rim Erosion
 uniform float erosionScale = 6.0;                    // @range 1 30 @label Erosion Texture Scale
 uniform float rimErosion = 0.6;                      // @range 0 1 @label Outer Rim Erosion
-uniform vec3 outlineColor = vec3(0.23, 1.0, 0.02);  // @color @label Outline Colour
+uniform vec3 outlineColor = vec3(0.23, 1.0, 0.02);  // @color @label Outline Color
 uniform float outlineThin = 0.14;                    // @range 0.01 0.4 @label Outline Thickness
 uniform float outlineBreak = 0.45;                   // @range 0 1 @label Outline Breakup
 uniform float outlineFragments = 0.35;               // @range 0 1 @label Outline Fragments
@@ -111,7 +111,7 @@ void main() {
   vec3 pt = paint2(adaptPos(object_pos - V * (h0 - 0.5) * heightRatio, object_normal), nWorld, axis, strokeSize, strokeLength, seed);
   float rnd = pt.x;
   float streak = pt.z;
-  float grey = fract(rnd * 7.13);
+  float gray = fract(rnd * 7.13);
 
   // Each stroke's own normal
   vec3 T = normalize(crossv(nWorld, vec3(0.0, 0.0, 1.0)) + vec3(0.0001, 0.0002, 0.0));
@@ -122,9 +122,9 @@ void main() {
   // Painted light in steps
   vec3 lc = mix(vec3(1.0, 1.0, 1.0), light_color / max(max(light_color.x, light_color.y), max(light_color.z, 0.001)), lightTint);
   float d = dot(nS, light_dir) * mix(1.0, occlusion, aoStrength * 0.6);
-  vec3 shadowCol = mix(shadowTone, undertone, grey * toneSplit);
-  vec3 lightCol = mix(lightTone, overtone, (1.0 - grey) * toneSplit) * lc;
-  vec3 midCol = mix(lightCol, mix(midTone, mix(shadowTone, lightTone, 0.5), grey * 0.3) * mix(vec3(1.0, 1.0, 1.0), lc, 0.5), step(2.5, toneCount));
+  vec3 shadowCol = mix(shadowTone, undertone, gray * toneSplit);
+  vec3 lightCol = mix(lightTone, overtone, (1.0 - gray) * toneSplit) * lc;
+  vec3 midCol = mix(lightCol, mix(midTone, mix(shadowTone, lightTone, 0.5), gray * 0.3) * mix(vec3(1.0, 1.0, 1.0), lc, 0.5), step(2.5, toneCount));
   vec3 c = mix(shadowCol, midCol, step(toonLow, d));
   c = mix(c, lightCol, step(toonHigh, d));
   c = c * (0.88 + 0.24 * streak);

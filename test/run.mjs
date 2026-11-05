@@ -1,10 +1,11 @@
 // Runs every check. Needs: Node 22.18+, glslangValidator, Python with the bpy module (pip install bpy),
 // Playwright with Chromium, and THREE=<path to three.module.js> (RICO's copy). GODOT=<godot binary> adds Godot
-// (Vulkan; on a machine with no GPU, Mesa's lavapipe works).
+// (Vulkan; on a machine with no GPU, Mesa's lavapipe works). The HLSL shaders in test/hlsl also need the
+// DirectX compiler (dxc) and SPIRV-Cross; set DXC and SPIRV_CROSS if they are not on the PATH.
 import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import { parse } from '../src/lang.ts'
-import { check, toBlender } from '../src/index.ts'
+import { check, toBlender, read } from '../src/index.ts'
 const sh = (c) => { console.log('\n$ ' + c); execSync(c, { stdio: 'inherit' }) }
 const T = 'test-out'
 fs.rmSync(T, { recursive: true, force: true }); fs.mkdirSync(T + '/rt/graphs', { recursive: true }); fs.mkdirSync(T + '/looks/graphs', { recursive: true })
@@ -14,6 +15,7 @@ const godot = process.env.GODOT ? `GODOT_ARGS="--rendering-driver vulkan --rende
 // 1. every target compiles
 sh('node bin/inoscula.ts examples/*.inoscula.json --out out')
 sh(`node test/validate.ts ${T}`)
+sh(`node test/dxc.ts ${T}/dxc`)
 
 // 2. examples: Blender bake vs RICO, as rendered and with identical inputs (the maths alone)
 const bl = 'out/toon/toon.blender.py out/ink/ink.blender.py out/kitchen-sink/kitchen-sink.blender.py'
@@ -34,6 +36,22 @@ for (const f of fs.readdirSync('looks')) {
 sh(`python3 test/blender_bake.py ${T}/looks ${py.join(' ')}`)
 sh(`node test/parity.mjs ${T}/looks/blender.json ${three} ${T}/looks ${T}/looks/graphs --exact`)
 if (godot) sh(`${godot} ${T}/looks/blender.json ${process.env.GODOT} ${T}/looks/godot ${T}/looks/graphs`)
+
+// 3b. shaders written in GLSL (Shadertoy, three.js, TouchDesigner, The Book of Shaders...) and HLSL (Unity, Unreal): the reader's graph
+// against the original drawn in a browser, then the same graph through Blender and Godot
+sh('node test/code_roundtrip.ts')
+sh(`node test/glsl_compare.mjs ${three} ${T}/glsl`)
+fs.mkdirSync(`${T}/glsl/graphs`, { recursive: true })
+const gpy = []
+for (const f of [...fs.readdirSync('test/glsl').map((x) => 'test/glsl/' + x), ...fs.readdirSync('test/hlsl').map((x) => 'test/hlsl/' + x)]) {
+  const g = read(fs.readFileSync(f, 'utf8'), f.split('/').pop()).graph
+  const base = f.split('/').pop().replace(/\.\w+$/, '')
+  fs.writeFileSync(`${T}/glsl/graphs/${base}.json`, JSON.stringify(g))
+  fs.writeFileSync(`${T}/glsl/${base}.blender.py`, toBlender(check(g))); gpy.push(`${T}/glsl/${base}.blender.py`)
+}
+sh(`python3 test/blender_bake.py ${T}/glsl ${gpy.join(' ')}`)
+sh(`node test/parity.mjs ${T}/glsl/blender.json ${three} ${T}/glsl ${T}/glsl/graphs --exact --differs shadertoy-fbm.glsl,shadertoy-voronoi.glsl`)
+if (godot) sh(`${godot} ${T}/glsl/blender.json ${process.env.GODOT} ${T}/glsl/godot ${T}/glsl/graphs`)
 
 // 4. Blender -> Inoscula -> RICO, including a material made by hand
 sh(`python3 test/blender_roundtrip.py ${T}/rt ${bl} test/artist_material.py`)

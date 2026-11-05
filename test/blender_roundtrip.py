@@ -1,4 +1,4 @@
-# Round trip, Blender side: (1) every Inoscula-made Blender material is read back into a Inoscula graph, and
+# Round trip, Blender side: (1) every Inoscula-made Blender material is read back into an Inoscula graph, and
 # (2) a material built by hand, the way an artist would, is imported and baked for comparison.
 #   python3 blender_roundtrip.py <out_dir> <shader.blender.py> [...]
 import sys, os, json, runpy

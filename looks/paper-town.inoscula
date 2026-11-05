@@ -1,10 +1,10 @@
-// Paper town: washi paper, woodblock colour, folds
+// Paper town: washi paper, woodblock color, folds
 name "Paper Town";
 
 uniform vec3 paperCol = vec3(0.92, 0.84, 0.70);  // @color @label Paper
-uniform vec3 blockCol = vec3(0.70, 0.18, 0.12);  // @color @label Woodblock Colour
+uniform vec3 blockCol = vec3(0.70, 0.18, 0.12);  // @color @label Woodblock Color
 uniform vec3 inkCol = vec3(0.10, 0.10, 0.18);    // @color @label Ink
-uniform float fibres = 0.6;                        // @range 0 1 @label Paper Fibres
+uniform float fibers = 0.6;                        // @range 0 1 @label Paper Fibers
 uniform float folds = 0.5;                         // @range 0 1 @label Folds
 uniform float fps = 12.0;                          // @range 0 24 @label Frames Per Second
 
@@ -13,16 +13,16 @@ void main() {
   vec3 jit = vec3(hash(vec3(frame, 7.0, 3.0)), hash(vec3(frame, 8.0, 3.0)), 0.0) * 0.15;
   vec3 p = object_pos + jit;
 
-  // Washi fibres
+  // Washi fibers
   float f1 = noise(p * vec3(1.0, 12.0, 1.0), 25.0, 2.0, 0.5, 2.0);
   float f2 = noise(p * vec3(12.0, 1.0, 1.0), 25.0, 2.0, 0.5, 2.0);
-  float strands = smoothstep(0.62, 0.72, max(f1, f2)) * fibres;
+  float strands = smoothstep(0.62, 0.72, max(f1, f2)) * fibers;
 
   // Folds
   float cells = voronoi(p, 2.5, 1.0);
   float crease = (1.0 - smoothstep(0.0, 0.06, abs(cells - 0.45))) * folds;
 
-  // Woodblock colour
+  // Woodblock color
   float ndl = dot(normal, light_dir);
   float printMask = smoothstep(0.45, 0.55, noise(p, 1.2, 2.0, 0.5, 2.0) + 0.15);
   vec3 c = mix(paperCol, blockCol, printMask * 0.85);

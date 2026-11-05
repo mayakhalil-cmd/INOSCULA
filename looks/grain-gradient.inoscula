@@ -1,4 +1,4 @@
-// Grain gradient: colour bands with a grainy blend
+// Grain gradient: color bands with a grainy blend
 name "Grain Gradient";
 
 uniform vec3 dark = vec3(0.13, 0.10, 0.36);  // @color @label Dark

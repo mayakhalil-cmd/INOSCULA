@@ -44,7 +44,7 @@ func _run() -> void:
 	vp.msaa_3d = Viewport.MSAA_4X
 	root.add_child(vp)
 	var env := Environment.new()
-	# a sky of one even colour, like Blender's world: lights and reflects
+	# a sky of one even color, like Blender's world: lights and reflects
 	var skym := ProceduralSkyMaterial.new()
 	var c := Color(0.35, 0.42, 0.55).linear_to_srgb()
 	skym.sky_top_color = c

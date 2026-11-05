@@ -1,11 +1,11 @@
 // Native node graphs: the shader rebuilt from each program's own nodes (Godot VisualShader, Unreal material
 // expressions, Unity Shader Graph). Maths become the program's maths nodes one for one; the parts no program has
-// a node for (Blender's noise, Voronoi and white noise, colour ramps, safe divide and power) become one small code
+// a node for (Blender's noise, Voronoi and white noise, color ramps, safe divide and power) become one small code
 // node each (Godot Expression, Unreal Custom, Unity Custom Function) that runs the same maths as every other target.
-import { helperParts, helpers, LANG, num, type Lang } from './code.ts'
-import { toUnreal } from './targets/hlsl.ts'
-import type { Arg, IR, Step } from './spec.ts'
-import type { GIn, GLink, GNode, NodeView, SockType } from './nodes.ts'
+import { helperParts, helpers, hlslSplats, LANG, num, type Lang } from './code.ts'
+import { toUnreal, UNREAL_ROUTE, unrealGlass } from './targets/hlsl.ts'
+import { InosculaError, paramDesc, type Arg, type IR, type Step } from './spec.ts'
+import { layoutNodes, type GIn, type GLink, type GNode, type NodeView, type SockType } from './nodes.ts'
 
 type Target = 'godot' | 'unreal' | 'unity'
 export interface NNode extends GNode {
@@ -178,7 +178,7 @@ export function nativeGraph(ir: IR, target: Target): Native {
         ? outs.map(([op]) => `${op} = ${srcCode.godot[op]};`).join('\n')
         : target === 'unreal' ? outs.slice(1).map(([op]) => `${op} = ${srcCode.unreal[op]};`).join('\n') + `\nreturn ${srcCode.unreal[outs[0][0]]};`
           : outs.map(([op]) => `${op} = ${srcCode.unity[op]};`).join('\n')
-      const node = add({ title: codeTitle, cls: codeCls, cat: 'custom', props: { description: 'Inoscula inputs' }, note: 'Inoscula inputs (Z up, metres)', code, ports: { ins: pins.map(([n, t]) => [n, t]), outs },
+      const node = add({ title: codeTitle, cls: codeCls, cat: 'custom', props: { description: 'Inoscula inputs' }, note: 'Inoscula inputs (Z up, meters)', code, ports: { ins: pins.map(([n, t]) => [n, t]), outs },
         ins: pins.map(([nm, t]) => ({ n: nm, t })), outs: outs.map(([nm, t]) => ({ n: nm, t })) })
       outs.forEach(([op], i) => sock.set(op, [node.id, i]))
       // what feeds the code node
@@ -208,7 +208,7 @@ export function nativeGraph(ir: IR, target: Target): Native {
       if (p.t === 'float' && p.min !== undefined && p.max !== undefined) Object.assign(props, { hint: 1, min: p.min, max: p.max })
       node = add({ title: cls.replace('VisualShaderNode', ''), cls, cat: 'param', props, ins: [], outs: [{ n: 'p_' + p.id, t: p.type === 'color' ? 'color' : st(p.t) }], note: label })
     } else if (target === 'unreal') {
-      node = add({ title: label, cls: p.t === 'float' ? 'MaterialExpressionScalarParameter' : 'MaterialExpressionVectorParameter', cat: 'param', props: { parameter_name: label, default_value: p.default, ...(p.t === 'float' && p.min !== undefined ? { slider_min: p.min, slider_max: p.max } : {}) }, ins: [], outs: [{ n: p.t === 'float' ? '' : 'RGB', t: p.type === 'color' ? 'color' : st(p.t) }], note: p.t === 'float' ? 'Param' : 'Param (Vector)' })
+      node = add({ title: label, cls: p.t === 'float' ? 'MaterialExpressionScalarParameter' : 'MaterialExpressionVectorParameter', cat: 'param', props: { parameter_name: label, default_value: p.default, ...(p.t === 'float' && p.min !== undefined ? { slider_min: p.min, slider_max: p.max } : {}), ...(p.group ? { group: p.group } : {}), ...(paramDesc(p) ? { desc: paramDesc(p) } : {}) }, ins: [], outs: [{ n: p.t === 'float' ? '' : 'RGB', t: p.type === 'color' ? 'color' : st(p.t) }], note: p.t === 'float' ? 'Param' : 'Param (Vector)' })
     } else {
       node = add({ title: label, cls: 'PropertyNode', cat: 'param', props: {}, ins: [], outs: [{ n: p.t === 'float' ? 'Float' : p.type === 'color' ? 'Color' : 'Vector3', t: p.type === 'color' ? 'color' : st(p.t) }], note: 'Blackboard property' })
     }
@@ -266,6 +266,8 @@ export function nativeGraph(ir: IR, target: Target): Native {
         codeNode(s, 'Divide (0 where b is 0)', (a) => `inoscula_div_${v ? 'v' : 'f'}(${v ? `${v3}(${a[0]})` : a[0]}, ${v ? `${v3}(${a[1]})` : a[1]})`, [['a', realType(s.args[0])], ['b', realType(s.args[1])]], [['out', st(s.type)]]); break
       case 'pow':
         codeNode(s, 'Power (safe)', (a) => `inoscula_pow_${v ? 'v' : 'f'}(${v ? `${v3}(${a[0]})` : a[0]}, ${v ? `${v3}(${a[1]})` : a[1]})`, [['a', realType(s.args[0])], ['b', realType(s.args[1])]], [['out', st(s.type)]]); break
+      case 'log':
+        codeNode(s, 'Logarithm (safe)', (a) => `(${a[0]} > 0.0 ? log(${a[0]}) : 0.0)`, [['x', 'float']], [['out', 'float']]); break
       case 'sqrt':
         codeNode(s, 'Square Root (safe)', (a) => `inoscula_sqrt_${v ? 'v' : 'f'}(${a[0]})`, [['x', st(s.type)]], [['out', st(s.type)]]); break
       case 'greater':
@@ -324,7 +326,7 @@ export function nativeGraph(ir: IR, target: Target): Native {
           ? `d\ncol\npos`.replace('d', `inoscula_voronoi_d(${a.join(', ')})`).replace('col', `inoscula_voronoi_c(${a.join(', ')})`).replace('pos', `inoscula_voronoi_p(${a.join(', ')})`)
           : `inoscula_voronoi(${a.join(', ')}, distance, color, position);`, [['p', 'vec3'], ['scale', 'float'], ['randomness', 'float']], [['distance', 'float'], ['color', 'vec3'], ['position', 'vec3']]); break
       case 'ramp':
-        codeNode(s, 'Colour Ramp', (a) => `inoscula_ramp_${s.id}(${a[0]})`, [['t', 'float']], [['color', 'vec3']]); break
+        codeNode(s, 'Color Ramp', (a) => `inoscula_ramp_${s.id}(${a[0]})`, [['t', 'float']], [['color', 'vec3']]); break
       default: {
         if (!sock.has(s.op)) throw new Error(`${target} nodes: no node for ${s.op}`)
         sock.set(s.id, sock.get(s.op)!)
@@ -337,6 +339,8 @@ export function nativeGraph(ir: IR, target: Target): Native {
     : target === 'unreal'
       ? [[ir.lit ? 'Base Color' : 'Emissive Color', ir.color, ir.lit ? 'MP_BASE_COLOR' : 'MP_EMISSIVE_COLOR', 'vec3'], [ir.cutout ? 'Opacity Mask' : 'Opacity', ir.alpha, ir.cutout ? 'MP_OPACITY_MASK' : 'MP_OPACITY', 'float'], ...(ir.lit ? [['Metallic', ir.metallic, 'MP_METALLIC', 'float', true], ['Roughness', ir.roughness, 'MP_ROUGHNESS', 'float', true], ['Emissive Color', ir.emission, 'MP_EMISSIVE_COLOR', 'vec3']] as [string, Arg | null, string, SockType, boolean?][] : [])]
       : [['Base Color', ir.color, 'BaseColor', 'vec3'], ['Alpha', ir.alpha, 'Alpha', 'float'], ...(ir.lit ? [['Metallic', ir.metallic, 'Metallic', 'float', true], ['Smoothness', ir.roughness, 'Smoothness', 'float', true], ['Emission', ir.emission, 'Emission', 'vec3']] as [string, Arg | null, string, SockType, boolean?][] : [])]
+  // glass (Unreal only here): the amount, IOR and dispersion go to the Scene Color step the script adds at the end
+  if (ir.glass && target === 'unreal') outs.push(['Glass', ir.glass.amount, 'INOSCULA_GLASS', 'float'], ['Glass IOR', ir.glass.ior, 'INOSCULA_IOR', 'float'], ['Glass Dispersion', ir.glass.dispersion, 'INOSCULA_DISPERSION', 'float'])
   const shown = outs.filter(([, a]) => a)
   if (ir.cutout && target === 'godot') shown.push(['Alpha Scissor Threshold', { k: 'lit', v: 0.5, type: 'float' }, 19, 'float'])
   const outTitle = { godot: 'Output', unreal: ir.name, unity: 'Fragment' }[target]
@@ -372,14 +376,50 @@ export function nativeGraph(ir: IR, target: Target): Native {
   return { nodes, links, target, out: out.id }
 }
 
+// the scalar defaults each expression keeps for an input with nothing wired to it
+const UE_CONST: Record<string, string[]> = {
+  MaterialExpressionAdd: ['const_a', 'const_b'], MaterialExpressionSubtract: ['const_a', 'const_b'], MaterialExpressionMultiply: ['const_a', 'const_b'],
+  MaterialExpressionDivide: ['const_a', 'const_b'], MaterialExpressionMin: ['const_a', 'const_b'], MaterialExpressionMax: ['const_a', 'const_b'],
+  MaterialExpressionLinearInterpolate: ['const_a', 'const_b', 'const_alpha'], MaterialExpressionClamp: ['', 'min_default', 'max_default'],
+  MaterialExpressionSmoothStep: ['const_min', 'const_max', 'const_value'],
+}
+
+// Unreal: a literal on an input with no default of its own needs a Constant node, as the Material Editor shows it.
+// The Nodes tab and the script both use this graph, with the same layout, so what you see is what gets built.
+export function unrealGraph(ir: IR): Native {
+  const g = nativeGraph(ir, 'unreal')
+  const nodes: NNode[] = g.nodes.map((n) => ({ ...n, ins: n.ins.map((i) => ({ ...i })) })), links = [...g.links]
+  let k = 0
+  for (const n of [...nodes]) {
+    if (n.cls === 'MaterialExpressionCustom') continue
+    n.ins.forEach((i, idx) => {
+      if (i.v === undefined || i.hide || links.some((l) => l.b === n.id && l.bi === idx)) return
+      if (n.id !== 'out' && UE_CONST[n.cls]?.[idx] && typeof i.v === 'number') return
+      const vec = Array.isArray(i.v), id = 'k' + k++
+      nodes.push({ id, title: vec ? 'Constant3Vector' : String(+(+(i.v as number)).toFixed(3)), cls: vec ? 'MaterialExpressionConstant3Vector' : 'MaterialExpressionConstant', cat: vec ? 'vconst' : 'const',
+        props: vec ? { constant: i.v } : { r: i.v }, ins: [], outs: [{ n: '', t: vec ? 'vec3' : 'float' }], ...(vec ? { swatch: i.v as number[] } : {}) })
+      links.push({ a: id, ao: 0, b: n.id, bi: idx })
+      delete i.v
+    })
+  }
+  for (const n of nodes) {
+    if (n.cls === 'MaterialExpressionVectorParameter') n.swatch = n.props.default_value as number[]
+    if (n.cat === 'param' && n.cls === 'MaterialExpressionVectorParameter') n.cat = 'vparam'
+  }
+  layoutNodes({ nodes, links }, true, 60, 24)
+  // the material's own output node sits at 0, 0 in the Material Editor; everything else is placed relative to it
+  const o = nodes.find((n) => n.id === 'out')!, ox = o.x!, oy = o.y!
+  for (const n of nodes) { n.x = Math.round(n.x! - ox); n.y = Math.round(n.y! - oy) }
+  return { ...g, nodes, links }
+}
 export function nativeView(ir: IR, target: Target): NodeView {
-  const g = nativeGraph(ir, target)
+  const g = target === 'unreal' ? unrealGraph(ir) : nativeGraph(ir, target)
   const legend = {
     godot: `Godot · VisualShader (Spatial, Fragment). These are the nodes in the .tres the Godot tab saves. Expression nodes run Blender's noise and Voronoi maths, from the Global Expression.`,
-    unreal: `Unreal · Material Editor. Maths are native expressions; Custom nodes carry Blender's noise, Voronoi and colour ramps so the pattern matches.`,
+    unreal: `Unreal · Material Editor. Maths are native expressions; Custom nodes carry Blender's noise, Voronoi and color ramps so the pattern matches.`,
     unity: `Unity · Shader Graph. The nodes to build it by hand. The Unity tab gives a ready Custom Function file for the same result.`,
   }[target]
-  return { nodes: g.nodes, links: g.links, theme: target, legend }
+  return { nodes: g.nodes, links: g.links, theme: target, legend, side: target !== 'blender', laid: target === 'unreal' }
 }
 
 // ------------------------------------------------------------------ Godot: write the VisualShader resource
@@ -394,6 +434,7 @@ const gv = (v: unknown, kind?: string): string => {
 }
 const PORT = { float: 0, vec3: 4, color: 4, shader: 0 } as Record<SockType, number>
 export function toGodotVisual(ir: IR): string {
+  if (ir.glass) throw new InosculaError('Glass is in the Godot shader code export (Shader code, .gdshader), not in the VisualShader nodes yet. Pick Shader code.')
   const g = nativeGraph(ir, 'godot')
   const gid = new Map<string, number>([['out', 0]])
   let next = 3
@@ -464,16 +505,12 @@ function inlineLiterals(n: NNode, links: GLink[], code: string, L: Lang) {
   return code
 }
 export function toUnrealNative(ir: IR, o: { folder?: string } = {}): string {
-  const g = nativeGraph(ir, 'unreal')
+  const g = unrealGraph(ir)
   const H = helperParts(LANG.hlsl)
   const py = (s: string) => JSON.stringify(s)
   const name = 'M_' + ir.name.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '')
-  const col = new Map<string, number>(), feeds = new Map<string, string[]>()
-  for (const l of g.links) (feeds.get(l.b) ?? feeds.set(l.b, []).get(l.b)!).push(l.a)
-  const colOf = (id: string): number => col.get(id) ?? (col.set(id, 0), col.set(id, 1 + Math.max(-1, ...(feeds.get(id) ?? []).map(colOf))), col.get(id)!)
-  g.nodes.forEach((n) => colOf(n.id))
-  const maxC = Math.max(...col.values()), rows = new Map<number, number>()
-  const xy = (n: NNode) => { const c = col.get(n.id)!, r = rows.get(c) ?? 0; rows.set(c, r + 1); return `${(c - maxC) * 320 - 300}, ${r * 180 - 300}` }
+  // the same places the Nodes tab draws them
+  const xy = (n: NNode) => `${n.x}, ${n.y}`
   const lc = (v: number[]) => `unreal.LinearColor(${v.map(num).join(', ')}, 1.0)`
   const out: string[] = []
   let k = 0
@@ -482,13 +519,6 @@ export function toUnrealNative(ir: IR, o: { folder?: string } = {}): string {
     if (Array.isArray(v)) out.push(`${id} = add(unreal.MaterialExpressionConstant3Vector, -2400, ${k * 60})`, `${id}.set_editor_property("constant", ${lc(v as number[])})`)
     else out.push(`${id} = add(unreal.MaterialExpressionConstant, -2400, ${k * 60})`, `${id}.set_editor_property("r", ${num(v as number)})`)
     return id
-  }
-  // the scalar defaults each expression keeps for an input with nothing wired to it
-  const CONST: Record<string, string[]> = {
-    MaterialExpressionAdd: ['const_a', 'const_b'], MaterialExpressionSubtract: ['const_a', 'const_b'], MaterialExpressionMultiply: ['const_a', 'const_b'],
-    MaterialExpressionDivide: ['const_a', 'const_b'], MaterialExpressionMin: ['const_a', 'const_b'], MaterialExpressionMax: ['const_a', 'const_b'],
-    MaterialExpressionLinearInterpolate: ['const_a', 'const_b', 'const_alpha'], MaterialExpressionClamp: ['', 'min_default', 'max_default'],
-    MaterialExpressionSmoothStep: ['const_min', 'const_max', 'const_value'],
   }
   for (const n of g.nodes) {
     if (n.id === 'out') continue
@@ -505,7 +535,7 @@ export function toUnrealNative(ir: IR, o: { folder?: string } = {}): string {
       if (op === 'voronoi') code = 'float d; float3 c; float3 q;\nf.inoscula_voronoi(p, scale, randomness, d, c, q);\ncolor = c;\nposition = q;\nreturn d;'
       else if (n.ports!.outs.length === 1 && /^\w+ = /.test(n.code!)) code = n.code!.replace(/^\w+ = /, 'return ')
       else code = n.code!
-      code = inlineLiterals(n, g.links, code, LANG.hlsl).replace(/\bvec3\(/g, 'float3(').replace(/(?<!\.)\binoscula_(?!\w+_k\b)/g, 'f.inoscula_')
+      code = hlslSplats(inlineLiterals(n, g.links, code, LANG.hlsl).replace(/\bvec3\(/g, 'float3(')).replace(/(?<!\.)\binoscula_(?!\w+_k\b)/g, 'f.inoscula_')
       const need = [H.base]
       if (op === 'noise' || op === 'white_noise') need.push(H.hash)
       if (op === 'noise') need.push(H.noise)
@@ -516,32 +546,38 @@ export function toUnrealNative(ir: IR, o: { folder?: string } = {}): string {
       const ot = (t: SockType) => (t === 'float' ? 'CMOT_FLOAT1' : 'CMOT_FLOAT3')
       out.push(`${n.id}.set_editor_property("code", ${py(code)})`)
       out.push(`${n.id}.set_editor_property("output_type", unreal.CustomMaterialOutputType.${ot(n.ports!.outs[0][1])})`)
-      out.push(`${n.id}.set_editor_property("inputs", [${n.ports!.ins.map(([nm]) => `unreal.CustomInput(input_name=${py(nm)})`).join(', ')}])`)
-      if (n.ports!.outs.length > 1) out.push(`${n.id}.set_editor_property("additional_outputs", [${n.ports!.outs.slice(1).map(([nm, t]) => `unreal.CustomOutput(output_name=${py(nm)}, output_type=unreal.CustomMaterialOutputType.${ot(t)})`).join(', ')}])`)
+      // inputs given as fixed numbers are written into the code (inlineLiterals), so they get no pin:
+      // Unreal refuses to compile a Custom node with an input pin that has nothing connected
+      const pins = n.ports!.ins.filter((_, i) => n.ins[i]?.v === undefined || g.links.some((l) => l.b === n.id && l.bi === i))
+      out.push(`${n.id}.set_editor_property("inputs", [${pins.map(([nm]) => `custom_input(${py(nm)})`).join(', ')}])`)
+      if (n.ports!.outs.length > 1) out.push(`${n.id}.set_editor_property("additional_outputs", [${n.ports!.outs.slice(1).map(([nm, t]) => `custom_output(${py(nm)}, unreal.CustomMaterialOutputType.${ot(t)})`).join(', ')}])`)
       continue
     }
     // literal inputs: the expression's own default where it has one, a constant node otherwise
     n.ins.forEach((i, idx) => {
       if (i.v === undefined || g.links.some((l) => l.b === n.id && l.bi === idx)) return
-      const prop = CONST[n.cls]?.[idx]
+      const prop = UE_CONST[n.cls]?.[idx]
       if (prop && typeof i.v === 'number') out.push(`${n.id}.set_editor_property(${py(prop)}, ${num(i.v)})`)
-      else out.push(`L.connect_material_expressions(${constNode(i.v)}, "", ${n.id}, ${py(i.n)})`)
+      else out.push(`link(${constNode(i.v)}, "", ${n.id}, ${py(i.n)})`)
     })
   }
   const outNode = g.nodes.find((n) => n.id === 'out')!
   const props = outNode.props.ports as string[]
+  // glass: the color and emissive are held for the glass step instead of going straight to the material
+  const held = (p: string) => p.startsWith('INOSCULA_') || (Boolean(ir.glass) && (p === 'MP_EMISSIVE_COLOR' || p === 'MP_BASE_COLOR'))
   for (const l of g.links) {
     const A = g.nodes.find((n) => n.id === l.a)!, B = g.nodes.find((n) => n.id === l.b)!
     const from = A.cls === 'MaterialExpressionCustom' && l.ao > 0 ? A.outs[l.ao].n : A.cls === 'MaterialExpressionVectorParameter' ? 'RGB' : ''
-    if (l.b === 'out') out.push(`L.connect_material_property(${l.a}, ${py(from)}, unreal.MaterialProperty.${props[l.bi]})`)
-    else out.push(`L.connect_material_expressions(${l.a}, ${py(from)}, ${l.b}, ${py(B.ins[l.bi].n)})`)
+    if (l.b === 'out') out.push(held(props[l.bi]) ? `route(${l.a}, ${py(from)}, ${py(props[l.bi])})` : `link_out(${l.a}, ${py(from)}, unreal.MaterialProperty.${props[l.bi]})`)
+    else out.push(`link(${l.a}, ${py(from)}, ${l.b}, ${py(B.ins[l.bi].n)})`)
   }
   outNode.ins.forEach((i, idx) => {
     if (i.v === undefined || g.links.some((l) => l.b === 'out' && l.bi === idx)) return
-    out.push(`L.connect_material_property(${constNode(i.v)}, "", unreal.MaterialProperty.${props[idx]})`)
+    out.push(held(props[idx]) ? `route(${constNode(i.v)}, "", ${py(props[idx])})` : `link_out(${constNode(i.v)}, "", unreal.MaterialProperty.${props[idx]})`)
   })
   const full = toUnreal(ir, { folder: o.folder })
-  const outline = full.includes('# ---- outline:') ? full.slice(full.indexOf('\n# ---- outline:')) : ''
+  // the outline and the Material Instance steps are the same as in the Custom node script
+  const outline = full.slice(full.indexOf(full.includes('# ---- outline:') ? '\n# ---- outline:' : '\n# ---- Material Instances'))
   return `# ${ir.name}, made with Inoscula. Native material expressions: every maths node is Unreal's own.
 # Run inside the Unreal Editor: Tools > Execute Python Script (needs the Python Editor Script Plugin).
 # Builds ${o.folder ?? '/Game/Inoscula'}/${name}. Parameters are Scalar and Vector Parameters, so a Material Instance and
@@ -559,18 +595,48 @@ if unreal.EditorAssetLibrary.does_asset_exist(path):
 else:
     mat = tools.create_asset(NAME, FOLDER, unreal.Material, unreal.MaterialFactoryNew())
 mat.set_editor_property("shading_model", unreal.MaterialShadingModel.${ir.lit ? 'MSM_DEFAULT_LIT' : 'MSM_UNLIT'})
-mat.set_editor_property("blend_mode", unreal.BlendMode.${ir.cutout ? 'BLEND_MASKED' : ir.alpha ? 'BLEND_TRANSLUCENT' : 'BLEND_OPAQUE'})${ir.cutout ? '\nmat.set_editor_property("two_sided", True)' : ''}${ir.lit && ir.bump ? '\nmat.set_editor_property("tangent_space_normal", False)  # the bump node gives a world space normal' : ''}
+mat.set_editor_property("blend_mode", unreal.BlendMode.${ir.cutout ? 'BLEND_MASKED' : ir.alpha || ir.glass ? 'BLEND_TRANSLUCENT' : 'BLEND_OPAQUE'})${ir.cutout ? '\nmat.set_editor_property("two_sided", True)' : ''}${ir.lit && ir.bump ? '\nmat.set_editor_property("tangent_space_normal", False)  # the bump node gives a world space normal' : ''}
+
+def custom_input(name):
+    # Unreal's CustomInput takes no constructor arguments, so set the name afterwards
+    c = unreal.CustomInput()
+    c.set_editor_property("input_name", name)
+    return c
+
+def custom_output(name, kind):
+    c = unreal.CustomOutput()
+    c.set_editor_property("output_name", name)
+    c.set_editor_property("output_type", kind)
+    return c
+
+failed = []
+def link(a, a_out, b, b_in):
+    if not L.connect_material_expressions(a, a_out, b, b_in):
+        failed.append("%s.%s -> %s.%s" % (a.get_name(), a_out or "out", b.get_name(), b_in or "in"))
+
+def link_out(a, a_out, prop):
+    if not L.connect_material_property(a, a_out, prop):
+        failed.append("%s.%s -> %s" % (a.get_name(), a_out or "out", prop))
+
+def report():
+    count = len(failed)
+    if failed:
+        unreal.log_error("Inoscula: %d connections failed:" % len(failed))
+        for f in failed:
+            unreal.log_error("  " + f)
+        del failed[:]
+    return count
 
 def add(cls, x, y):
     return L.create_material_expression(mat, cls, x, y)
-
+${ir.glass ? UNREAL_ROUTE : ''}
 ${out.join('\n')}
-
-L.layout_material_expressions(mat)
+${ir.glass ? unrealGlass(ir.lit, -1700, Math.max(...g.nodes.map((n) => n.y! + n.h!)) - 400) : ''}
 L.recompile_material(mat)
+nfail = report()
 # keep the Inoscula graph on the asset, so it can travel back out with any changes
 unreal.EditorAssetLibrary.set_metadata_tag(mat, "inoscula", ${py(JSON.stringify(ir.source))})
 unreal.EditorAssetLibrary.save_asset(path)
-print("Inoscula: built " + path)
+print("Inoscula: built " + path + ("" if not nfail else " (with %d failed connections, see the errors above)" % nfail))
 ${outline}`
 }

@@ -1,9 +1,9 @@
 // Hand painted: painted light, cool shadows, matte paint
 name "Hand Painted";
 
-uniform vec3 localColor = vec3(0.55, 0.24, 0.13);   // @color @label Object Colour
-uniform vec3 lightTint = vec3(1.0, 0.86, 0.62);     // @color @label Light Colour
-uniform vec3 shadowTint = vec3(0.28, 0.22, 0.62);   // @color @label Shadow Colour
+uniform vec3 localColor = vec3(0.55, 0.24, 0.13);   // @color @label Object Color
+uniform vec3 lightTint = vec3(1.0, 0.86, 0.62);     // @color @label Light Color
+uniform vec3 shadowTint = vec3(0.28, 0.22, 0.62);   // @color @label Shadow Color
 uniform vec3 edgeTint = vec3(1.0, 0.32, 0.18);      // @color @label Light-To-Shadow Band
 uniform vec3 bounceTint = vec3(0.95, 0.55, 0.35);   // @color @label Bounce Light
 uniform vec3 rimTint = vec3(0.55, 0.75, 1.0);       // @color @label Rim Light
@@ -15,7 +15,7 @@ uniform float brushiness = 0.22;                     // @range 0 0.6 @label Brus
 uniform float softness = 0.07;                       // @range 0.01 0.4 @label Value Softness
 uniform float valueSteps = 5.0;                      // @range 2 10 @label Paint Values
 uniform float stepped = 0.85;                        // @range 0 1 @label Stroke Values
-uniform float hueJitter = 0.18;                      // @range 0 0.5 @label Stroke Colour Jitter
+uniform float hueJitter = 0.18;                      // @range 0 0.5 @label Stroke Color Jitter
 uniform float shadowEdge = 0.62;                     // @range 0 1 @label Shadow Edge
 uniform float bandWidth = 0.08;                      // @range 0 0.3 @label Band Width
 uniform float bounce = 0.3;                          // @range 0 1 @label Bounce Amount

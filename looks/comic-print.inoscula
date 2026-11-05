@@ -2,7 +2,7 @@
 name "Comic Print";
 
 uniform vec3 paper = vec3(0.98, 0.93, 0.80);  // @color @label Paper
-uniform vec3 base = vec3(0.86, 0.10, 0.16);   // @color @label Base Colour
+uniform vec3 base = vec3(0.86, 0.10, 0.16);   // @color @label Base Color
 uniform vec3 shade = vec3(0.10, 0.12, 0.45);  // @color @label Shadow Ink
 uniform vec3 ink = vec3(0.03, 0.02, 0.05);    // @color @label Line Ink
 uniform float dots = 14.0;                     // @range 4 40 @label Dot Density

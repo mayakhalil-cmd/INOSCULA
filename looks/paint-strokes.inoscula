@@ -15,7 +15,7 @@ uniform float erosion = 0.5;                       // @range 0 1 @label Edge Ero
 uniform float fps = 6.0;                           // @range 0 24 @label Repaint FPS
 uniform float repaint = 0.0;                       // @range 0 1 @label Repaint Amount
 uniform float lineWidth = 0.008;                   // @range 0 0.05 @label Outline Width
-uniform vec3 lineColor = vec3(0.06, 0.03, 0.09);  // @color @label Outline Colour
+uniform vec3 lineColor = vec3(0.06, 0.03, 0.09);  // @color @label Outline Color
 
 vec3 crossv(vec3 a, vec3 b) {
   return vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);

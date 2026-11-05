@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { check, toThree, toUnity, toUnreal } from '../src/index.ts'
 import { parse } from '../src/lang.ts'
+import { read } from '../src/read.ts'
 
 const tmp = process.argv[2]
 let bad = 0
@@ -16,13 +17,17 @@ const HL = ['-D', '-V', '-o', tmp + '/x.spv', '-e', 'main', '-S', 'frag']
 const sources: [string, any][] = [
   ...fs.readdirSync('examples').map((f) => [f, JSON.parse(fs.readFileSync('examples/' + f, 'utf8'))] as [string, any]),
   ...fs.readdirSync('looks').map((f) => [f, parse(fs.readFileSync('looks/' + f, 'utf8'))] as [string, any]),
+  ...fs.readdirSync('test/glsl').map((f) => [f, read(fs.readFileSync('test/glsl/' + f, 'utf8'), f).graph] as [string, any]),
+  ...fs.readdirSync('test/hlsl').map((f) => [f, read(fs.readFileSync('test/hlsl/' + f, 'utf8'), f).graph] as [string, any]),
 ]
 const PIN: Record<string, string> = { UV: 'float2', ObjPos: 'float3', ObjNrm: 'float3', WPos: 'float3', WNrm: 'float3', CamVec: 'float3', Time: 'float', LightDir: 'float4', LightColor: 'float4', VCol: 'float4' }
 const OUT: Record<string, string> = { CMOT_FLOAT1: 'float', CMOT_FLOAT3: 'float3' }
 function unrealWrap(py: string, ir: any) {
   const code = JSON.parse(py.match(/custom\.set_editor_property\("code", (".*")\)/)![1])
   const pins = [...py.matchAll(/pins\.append\(\("([^"]+)"/g)].map((m) => m[1])
-  const outs = [...py.matchAll(/CustomOutput\(output_name="([^"]+)", output_type=unreal\.CustomMaterialOutputType\.(\w+)\)/g)].map((m) => `inout ${OUT[m[2]]} ${m[1]}`)
+  // only the main Custom node's extra outputs (the glass step adds Custom nodes of its own)
+  const block = py.split('custom.set_editor_property("additional_outputs", [')[1]?.split('])')[0] ?? ''
+  const outs = [...block.matchAll(/custom_output\("([^"]+)", unreal\.CustomMaterialOutputType\.(\w+)\)/g)].map((m) => `inout ${OUT[m[2]]} ${m[1]}`)
   const sig = [...pins.map((p) => `${PIN[p] ?? (ir.params.find((q: any) => 'P_' + q.id === p)?.t === 'vec3' ? 'float4' : 'float')} ${p}`), ...outs]
   // Unreal pastes Custom node code inside a function. Its compilers accept the struct there; glslang only accepts
   // structs with methods at file scope, so the struct is lifted out for this check. The code itself is unchanged.

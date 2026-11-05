@@ -19,8 +19,8 @@ export interface ThreeShader {
   vertexShader: string
   fragmentShader: string
   /** Uniform names and starting values. Vectors are [x, y, z]. */
-  uniforms: Record<string, number | [number, number, number]>
-  /** Whether the mesh's vertex colours (shape data) are read. */
+  uniforms: Record<string, number | [number, number, number] | [number, number]>
+  /** Whether the mesh's vertex colors (shape data) are read. */
   vertexColors: boolean
   /** Lit only: turns three's MeshPhysicalMaterial shaders into this shader. Use in onBeforeCompile. */
   litPatch?: (vertexShader: string, fragmentShader: string) => { vertexShader: string; fragmentShader: string }
@@ -60,7 +60,19 @@ function inputs(ir: IR, o: ThreeOpts, uvExpr: string) {
   float g_curv = mix(0.5, g_vshape.x, inoscula_has_shape(g_vshape));
   float g_occ = mix(1.0, g_vshape.y, inoscula_has_shape(g_vshape));
   float g_osize = inoscula_object_size;
-${body(ir, LANG.glsl)}`
+${body(ir, LANG.glsl)}${ir.glass ? '\n' + glassCode(ir, o) : ''}`
+}
+
+// Glass: the scene behind the object (drawn without it into inoscula_behind each frame, see rico.ts), read a
+// little to the side along the surface's view space normal, once per color channel so the edges split like a prism
+function glassCode(ir: IR, o: ThreeOpts) {
+  const behind = o.bakeUV ? '  vec3 g_behind = vec3(0.0); // flattened for the bake: nothing behind' : `  vec3 g_vn = normalize((viewMatrix * vec4(normalize(g_vwnrm), 0.0)).xyz);
+  vec2 g_suv = gl_FragCoord.xy * inoscula_screen_inv;
+  vec2 g_bend = -g_vn.xy * (g_out_ior - 1.0) * 0.2;
+  vec3 g_behind = vec3(texture(inoscula_behind, g_suv + g_bend * (1.0 - 0.5 * g_out_disp)).r,
+    texture(inoscula_behind, g_suv + g_bend).g,
+    texture(inoscula_behind, g_suv + g_bend * (1.0 + 0.5 * g_out_disp)).b);`
+  return ir.lit ? behind : `${behind}\n  g_out_color = mix(g_out_color, g_behind, g_out_glass);`
 }
 
 export function toThree(ir: IR, o: ThreeOpts = {}): ThreeShader {
@@ -69,7 +81,8 @@ export function toThree(ir: IR, o: ThreeOpts = {}): ThreeShader {
   uniforms.inoscula_time = 0
   uniforms.inoscula_light_dir = [0.4, 0.8, 0.45] // three space (Y up), towards the light
   uniforms.inoscula_light_color = [1, 1, 1]
-  uniforms.inoscula_object_size = 2 // metres; look.fitTo(obj) sets it per object
+  uniforms.inoscula_object_size = 2 // meters; look.fitTo(obj) sets it per object
+  if (ir.glass) uniforms.inoscula_screen_inv = [1 / 1024, 1 / 1024] // look.renderBehind sets both
   const vertexColors = ir.uses.has('curvature') || ir.uses.has('occlusion')
   const decl = [
     ...ir.params.map((p) => `uniform ${p.t === 'vec3' ? 'vec3' : 'float'} p_${p.id};`),
@@ -77,8 +90,9 @@ export function toThree(ir: IR, o: ThreeOpts = {}): ThreeShader {
     'uniform vec3 inoscula_light_dir;',
     'uniform vec3 inoscula_light_color;',
     'uniform float inoscula_object_size;',
+    ...(ir.glass ? ['uniform sampler2D inoscula_behind;', 'uniform vec2 inoscula_screen_inv;'] : []),
   ].join('\n')
-  // vertex colour red = curvature, green = occlusion; without shape data: flat and open
+  // vertex color red = curvature, green = occlusion; without shape data: flat and open
   const shape = vertexColors ? '#ifdef USE_COLOR\n  g_vshape = color.rgb;\n#else\n  g_vshape = vec3(0.5, 1.0, 0.0);\n#endif' : 'g_vshape = vec3(0.5, 1.0, 0.0);'
 
   const vertexShader = `${VARYINGS}
@@ -114,33 +128,49 @@ ${o.bakeUV ? '' : '  #include <tonemapping_fragment>\n  #include <colorspace_fra
       return name
     }
     const w = bind(ir.outline.width, 'inoscula_outline_width', ''), c = bind(ir.outline.color, 'inoscula_outline_color', ''), b = bind(ir.outline.breakup, 'inoscula_outline_breakup', '')
+    const of = bind(ir.outline.offset, 'inoscula_outline_offset', ''), bo = bind(ir.outline.boil, 'inoscula_outline_boil', '')
     out.outline = {
-      uniforms: { inoscula_outline_width: w, inoscula_outline_color: c, inoscula_outline_breakup: b },
+      uniforms: { inoscula_outline_width: w, inoscula_outline_color: c, inoscula_outline_breakup: b, inoscula_outline_offset: of, inoscula_outline_boil: bo, inoscula_time: 'inoscula_time', inoscula_object_size: 'inoscula_object_size' },
       vertexShader: `uniform float inoscula_outline_width;
+uniform float inoscula_outline_offset;
 varying vec3 g_vobj;
 varying vec3 g_vw;
 varying vec3 g_vn;
 void main() {
   g_vobj = position;
   g_vn = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
-  vec3 p = position + normalize(normal) * inoscula_outline_width / max(length((modelMatrix * vec4(normalize(normal), 0.0)).xyz), 1e-6);
+  vec3 p = position + normalize(normal) * (inoscula_outline_width + inoscula_outline_offset) / max(length((modelMatrix * vec4(normalize(normal), 0.0)).xyz), 1e-6);
   g_vw = (modelMatrix * vec4(p, 1.0)).xyz;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }`,
       fragmentShader: `uniform vec3 inoscula_outline_color;
 uniform float inoscula_outline_breakup;
+uniform float inoscula_outline_width;
+uniform float inoscula_outline_offset;
+uniform float inoscula_outline_boil;
+uniform float inoscula_time;
+uniform float inoscula_object_size;
 varying vec3 g_vobj;
 varying vec3 g_vw;
 varying vec3 g_vn;
 ${TO_CANON}
 ${noiseHelpers(LANG.glsl)}
 void main() {
+  // boil: the noise jumps to a new place this many times a second, so the line redraws like hand animation
+  float g_seed = inoscula_outline_boil > 0.0 ? floor(inoscula_time * inoscula_outline_boil) : 0.0;
+  vec3 g_q = inoscula_canon(g_vobj) + fract(g_seed * vec3(0.1031, 0.1030, 0.0973)) * 37.0;
   // a broken, hand-inked line: the same noise in every tool eats into it
-  if (inoscula_outline_breakup > 0.0 && inoscula_noise(inoscula_canon(g_vobj), 30.0, 2.0, 0.5, 2.0) < inoscula_outline_breakup) discard;
-${ir.outline.rings ? `  // loose offset lines: thin rings across the halo, each wobbling on its own
+  if (inoscula_outline_breakup > 0.0 && inoscula_noise(g_q, 30.0, 2.0, 0.5, 2.0) < inoscula_outline_breakup) discard;
   float g_face = abs(dot(normalize(g_vn), normalize(cameraPosition - g_vw)));
+  // offset: leave a gap between the surface and the line (measured as if the shape were round)
+  if (inoscula_outline_offset > 0.0) {
+    float g_r = inoscula_object_size * 0.5;
+    float g_k = (g_r + inoscula_outline_offset) / (g_r + inoscula_outline_offset + inoscula_outline_width);
+    if (g_face > sqrt(max(1.0 - g_k * g_k, 0.0))) discard;
+  }
+${ir.outline.rings ? `  // loose offset lines: thin rings across the halo, each wobbling on its own
   if (g_face > 0.55) discard; // flat faces turned to the camera (a cylinder's cap) show no rings
-  if (fract(g_face * ${ir.outline.rings}.0 * 1.6 + inoscula_noise(inoscula_canon(g_vobj), 3.0, 1.0, 0.5, 2.0) * 0.7) > 0.3) discard;
+  if (fract(g_face * ${ir.outline.rings}.0 * 1.6 + inoscula_noise(g_q, 3.0, 1.0, 0.5, 2.0) * 0.7) > 0.3) discard;
 ` : ''}  gl_FragColor = vec4(inoscula_outline_color, 1.0);
   #include <colorspace_fragment>
 }`,
@@ -157,14 +187,14 @@ ${ir.outline.rings ? `  // loose offset lines: thin rings across the halo, each 
     const f: [string, string][] = [
       ['#include <common>', `${VARYINGS}\n${decl}\n${TO_CANON}\n${helpers(ir, LANG.glsl)}`],
       ['#include <clipping_planes_fragment>', inputs(ir, o, 'vUv')],
-      ['#include <color_fragment>', '  diffuseColor.rgb = g_out_color;\n  diffuseColor.a *= g_out_alpha;'],
+      ['#include <color_fragment>', `  diffuseColor.rgb = g_out_color${ir.glass ? ' * (1.0 - g_out_glass)' : ''};\n  diffuseColor.a *= g_out_alpha;`],
       ['#include <roughnessmap_fragment>', '  roughnessFactor = clamp(g_out_rough, 0.0, 1.0);'],
       ['#include <metalnessmap_fragment>', '  metalnessFactor = clamp(g_out_metal, 0.0, 1.0);'],
       ...(ir.bump ? [['#include <normal_fragment_maps>', '  normal = inoscula_bump(-vViewPosition, normal, g_out_bump);'] as [string, string]] : []),
       // layers: three's physical material has clear coat and sheen; it has no subsurface scattering
       ...(L.coat ? [['#include <lights_physical_fragment>', '#ifdef USE_CLEARCOAT\n  material.clearcoat = saturate(g_out_coat);\n  material.clearcoatRoughness = clamp(g_out_coat_rough, 0.0525, 1.0);\n#endif'] as [string, string]] : []),
       ...(L.sheen ? [['#include <lights_physical_fragment>', '#ifdef USE_SHEEN\n  material.sheenColor = g_out_sheen_color * saturate(g_out_sheen);\n  material.sheenRoughness = clamp(g_out_sheen_rough, 0.07, 1.0);\n#endif'] as [string, string]] : []),
-      ['#include <emissivemap_fragment>', '  totalEmissiveRadiance += g_out_emit;'],
+      ['#include <emissivemap_fragment>', `  totalEmissiveRadiance += g_out_emit${ir.glass ? ' + g_behind * g_out_glass' : ''};`],
     ]
     out.litEdits = { vertex: v, fragment: f }
     out.litPatch = (vs, fs) => ({ vertexShader: applyEdits(vs, v), fragmentShader: applyEdits(fs, f) })

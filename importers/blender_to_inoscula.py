@@ -1,4 +1,4 @@
-# Blender -> Inoscula. Reads a material's shader nodes (and any node groups inside it) and writes a Inoscula graph,
+# Blender -> Inoscula. Reads a material's shader nodes (and any node groups inside it) and writes an Inoscula graph,
 # which Inoscula then rebuilds natively for Godot, Unreal, Unity, three.js and RICO Engine.
 #
 # In Blender: open this in the Text Editor, select an object, Run Script. The graph is copied to the clipboard
@@ -14,7 +14,7 @@ MATH = {"ADD": "add", "SUBTRACT": "sub", "MULTIPLY": "mul", "DIVIDE": "div", "PO
         "GREATER_THAN": "greater", "EXPONENT": "exp", "SQRT": "sqrt"}
 VMATH = {"ADD": "add", "SUBTRACT": "sub", "MULTIPLY": "mul", "DIVIDE": "div", "MINIMUM": "min", "MAXIMUM": "max",
          "ABSOLUTE": "abs", "FLOOR": "floor", "FRACTION": "fract", "SINE": "sin", "COSINE": "cos", "NORMALIZE": "normalize"}
-LUMA = (0.2126, 0.7152, 0.0722)  # Blender's default (Rec. 709) weights when a colour plugs into a number
+LUMA = (0.2126, 0.7152, 0.0722)  # Blender's default (Rec. 709) weights when a color plugs into a number
 
 
 class Importer:
@@ -214,7 +214,7 @@ class Importer:
         if t == "ShaderNodeTexNoise":
             normalize = nd.normalize if hasattr(nd, "normalize") else socket(nd.inputs, "Normalize").default_value
             if nd.noise_dimensions != "3D" or getattr(nd, "noise_type", "FBM") != "FBM" or not normalize:
-                return self.unsupported(nd, "Noise Texture that is not 3D, fBM, normalised")
+                return self.unsupported(nd, "Noise Texture that is not 3D, fBM, normalized")
             if sock.identifier != "Fac":
                 return self.unsupported(nd, "Noise Texture > Color")
             dist = socket(nd.inputs, "Distortion")
@@ -344,6 +344,18 @@ def surface_color(imp, mat):
             return col, None
         if t == "ShaderNodeMixShader":
             a, b = nd.inputs[1], nd.inputs[2]
+            # glass: the surface mixed with refraction by the group's Glass output, its IOR and dispersion
+            # read back from what the group's Glass IOR and Glass Dispersion outputs feed
+            if a.is_linked and b.is_linked and b.links[0].from_node.bl_idname in ("ShaderNodeBsdfRefraction", "ShaderNodeAddShader"):
+                fac = nd.inputs[0]
+                imp.glass = {"glass": imp.input(fac, ctx, "float")}
+                if fac.is_linked:
+                    gnode = fac.links[0].from_node
+                    for key, nm in (("ior", "Glass IOR"), ("dispersion", "Glass Dispersion")):
+                        so = next((l.to_socket for l in nt.links if l.from_node == gnode and l.from_socket.name == nm), None)
+                        if so is not None:
+                            imp.glass[key] = imp.input(so, ctx, "float")
+                return shader(a.links[0].from_socket)
             if a.is_linked and a.links[0].from_node.bl_idname == "ShaderNodeBsdfTransparent" and b.is_linked:
                 col, _ = shader(b.links[0].from_socket)
                 return col, imp.input(nd.inputs[0], ctx, "float")
@@ -386,6 +398,7 @@ def surface_color(imp, mat):
 def material_to_inoscula(mat):
     imp = Importer(mat.name)
     imp.lit = {}
+    imp.glass = {}
     color, alpha = surface_color(imp, mat)
     name = imp.source.get("name", mat.name) if imp.source else mat.name
     g = {"inoscula": "0.1", "name": name, "params": imp.params, "nodes": imp.nodes, "output": {"color": color}}
@@ -394,6 +407,7 @@ def material_to_inoscula(mat):
     if imp.lit:
         g["shading"] = "lit"
         g["output"].update(imp.lit)
+    g["output"].update(imp.glass)
     # settings that live outside the node tree (cutout, brush cards, rim shells, the outline pass) come back from
     # the graph stored in the group; the outline keeps any parameter it is wired to
     src = imp.source or {}
@@ -401,7 +415,7 @@ def material_to_inoscula(mat):
         if key in src:
             g[key] = src[key]
     ids = {p["id"] for p in g["params"]}
-    for key in ("outline", "outline_color", "outline_breakup", "outline_rings"):
+    for key in ("outline", "outline_color", "outline_breakup", "outline_rings", "outline_offset", "outline_boil"):
         v = src.get("output", {}).get(key)
         if v is None:
             continue

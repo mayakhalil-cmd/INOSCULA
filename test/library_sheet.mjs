@@ -7,8 +7,8 @@ import { stripTypeScriptTypes } from 'node:module'
 import { chromium } from 'playwright'
 
 const [threeFile, outPng, secs = '1.3'] = process.argv.slice(2)
-const order = [['oil-paint', 'Sphere'], ['wet-stroke', 'Puppet'], ['hand-painted', 'Puppet'], ['oil-strokes', 'Puppet'], ['paint-strokes', 'Puppet'], ['painted-planes', 'Knot'], ['paint-with-light', 'Puppet'], ['painted-character', 'Puppet'], ['paint-bands', 'Knot'], ['hard-reflections', 'Knot'], ['comic-print', 'Knot'], ['mono-ink', 'Puppet'], ['ink-city', 'Box'],
-  ['engraving', 'Knot'], ['grain-gradient', 'Puppet'], ['iridescent', 'Knot'], ['claymation', 'Puppet']]
+const order = [['oil-paint', 'Sphere'], ['wet-stroke', 'Puppet'], ['hand-painted', 'Puppet'], ['oil-strokes', 'Puppet'], ['paint-strokes', 'Puppet'], ['painted-planes', 'Knot'], ['paint-with-light', 'Puppet'], ['painted-character', 'Puppet'], ['brush-paint', 'Knot'], ['paint-bands', 'Knot'], ['hard-reflections', 'Knot'], ['comic-print', 'Knot'], ['mono-ink', 'Puppet'],
+  ['engraving', 'Knot'], ['grain-gradient', 'Puppet'], ['retro-bits', 'Box'], ['iridescent', 'Knot'], ['claymation', 'Puppet'], ['puppet-felt', 'Puppet'], ['knit', 'Knot'], ['crochet', 'Puppet'], ['paper-town', 'Box'], ['aged-concrete', 'Box']]
 const looks = order.map(([n, shape]) => ({ code: fs.readFileSync(`looks/${n}.inoscula`, 'utf8'), shape }))
 const COLS = 6, CW = 360, CH = 380
 const W = COLS * CW, H = Math.ceil(looks.length / COLS) * CH
@@ -61,7 +61,7 @@ for (const [i, l] of looks.entries()) {
   sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3 }); sun.shadow.bias = -0.0005
   scene.add(sun, sun.target)
   const look = inosculaMaterial(THREE, parse(l.code))
-  if (!look.material.isMeshPhysicalMaterial) look.material.toneMapped = false // stylised colours show as written, as RICO shows them
+  if (!look.material.isMeshPhysicalMaterial) look.material.toneMapped = false // stylized colors show as written, as RICO shows them
   const obj = SHAPES[l.shape](); obj.rotation.set(0.25, 0.55, 0)
   if (look.material.isMeshPhysicalMaterial) shapeData(obj)
   obj.traverse((o) => { if (o.isMesh) { o.material = look.material; o.castShadow = o.receiveShadow = true } })

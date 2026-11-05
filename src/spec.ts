@@ -2,7 +2,7 @@
 // This file is the whole language: the graph format, every node, and the checker that turns a graph into a
 // typed, ordered list of steps (the IR) that every target prints in its own way.
 //
-// Space convention (the "canonical space"): Z up, right handed, metres, UV origin bottom left. This is Blender's
+// Space convention (the "canonical space"): Z up, right handed, meters, UV origin bottom left. This is Blender's
 // convention, so Blender graphs stay clean; code targets convert their inputs into it with one line each.
 
 export type Type = 'float' | 'vec3'
@@ -18,6 +18,15 @@ export interface Param {
   label?: string
   min?: number
   max?: number
+  // how the control is shown: a slider (the default), an on/off switch, or a list of named choices (0, 1, 2...)
+  ui?: 'toggle' | 'menu'
+  options?: string[]
+  // slider steps, for whole numbers use 1
+  step?: number
+  // the section the control sits in, in every program that has sections
+  group?: string
+  // a short description, shown as a tooltip where the program has one
+  desc?: string
 }
 
 export interface Node {
@@ -32,7 +41,7 @@ export interface Graph {
   name: string
   params?: Param[]
   nodes: Node[]
-  /** "unlit" (default): color is the final colour, identical in every tool. "lit": color is the base colour of
+  /** "unlit" (default): color is the final color, identical in every tool. "lit": color is the base color of
    *  a physically based material, and each tool's own renderer lights it (Principled BSDF, Unreal Default Lit,
    *  Godot and Unity standard lit, RICO physical material). */
   shading?: 'unlit' | 'lit'
@@ -49,14 +58,28 @@ export interface Graph {
     color: Wire; alpha?: Wire; roughness?: Wire; metallic?: Wire; bump?: Wire; emission?: Wire
     /** Layers on top of the base, as in OpenPBR, Unreal Substrate and Blender's Principled BSDF. */
     coat?: Wire; coat_roughness?: Wire; sheen?: Wire; sheen_color?: Wire; sheen_roughness?: Wire; subsurface?: Wire
-    /** An ink outline drawn outside the silhouette (an inflated, inside-out copy of the mesh). Width in metres.
-     *  Width and colour are a number or colour, or a parameter, so every tool can animate them. */
+    /** An ink outline drawn outside the silhouette (an inflated, inside-out copy of the mesh). Width in meters.
+     *  Width and color are a number or color, or a parameter, so every tool can animate them. */
     outline?: Wire; outline_color?: Wire
     /** 0 for a solid line, up to 1 for a broken, hand-inked line (noise eats into it). */
     outline_breakup?: Wire
     /** 0 (default) draws the outline as one band. 1 to 4 turns the band into that many thin, loose lines that
      *  float around the shape at different offsets, like quick pencil passes. A fixed number. */
     outline_rings?: Wire
+    /** How far the outline floats off the surface, in meters, leaving a gap between the mesh and the line. 0 (default)
+     *  starts it at the surface. The gap is measured as if the shape were round, using its size. */
+    outline_offset?: Wire
+    /** How many times a second the floating lines and the breakup redraw, like boiling hand-drawn animation. 0
+     *  (default) keeps them still. */
+    outline_boil?: Wire
+    /** Glass: how much of what is behind the surface shows through it, bent by the surface (0 = solid, the
+     *  default; 1 = clear glass). Where it is clear, the color comes from the scene behind instead. */
+    glass?: Wire
+    /** How strongly the glass bends what is behind it, as an index of refraction (1 = not at all, 1.45 by default,
+     *  glass is about 1.5, diamond 2.4). */
+    ior?: Wire
+    /** Splits the bent image into red, green and blue, like a prism (0 = none, the default; 1 = strong). */
+    dispersion?: Wire
   }
 }
 
@@ -82,16 +105,16 @@ export const OPS: Record<string, OpDef> = {
   // inputs from the engine (all in canonical space)
   uv: { ins: [], out: one('vec3'), source: true, doc: 'Mesh UV as (u, v, 0), origin bottom left.' },
   object_pos: { ins: [], out: one('vec3'), source: true, doc: 'Position in the object\'s own space. Moves with the object.' },
-  world_pos: { ins: [], out: one('vec3'), source: true, doc: 'Position in world space, metres.' },
+  world_pos: { ins: [], out: one('vec3'), source: true, doc: 'Position in world space, meters.' },
   normal: { ins: [], out: one('vec3'), source: true, doc: 'World space surface normal.' },
   object_normal: { ins: [], out: one('vec3'), source: true, doc: 'Object space surface normal.' },
   view_dir: { ins: [], out: one('vec3'), source: true, doc: 'World space direction from the surface towards the camera.' },
   time: { ins: [], out: one('float'), source: true, doc: 'Seconds.' },
   light_dir: { ins: [], out: one('vec3'), source: true, doc: 'Lighting contract: world direction towards the main light.' },
-  light_color: { ins: [], out: one('vec3'), source: true, doc: 'Lighting contract: main light colour.' },
-  curvature: { ins: [], out: one('float'), source: true, doc: 'Shape data: 0.5 on flat areas, towards 1 on sharp outer edges, towards 0 in creases. Stored in the mesh (vertex colour red) by Inoscula Studio\'s Prepare model.' },
-  object_size: { ins: [], out: one('float'), source: true, doc: 'How big the object is, in metres: the diagonal of its bounding box. Lets a look keep the same number of strokes, tiles or spots on any object. RICO: look.fitTo(obj); Blender: the object property inoscula_object_size (the export sets it); Godot: the instance parameter inoscula_object_size (the light bridge sets it); Unreal: Object Radius; Unity: wire the Object node\'s Bounds Size length. 2.0 when unknown.' },
-  occlusion: { ins: [], out: one('float'), source: true, doc: 'Shape data: 1 in the open, towards 0 in crevices and contact areas. Stored in the mesh (vertex colour green).' },
+  light_color: { ins: [], out: one('vec3'), source: true, doc: 'Lighting contract: main light color.' },
+  curvature: { ins: [], out: one('float'), source: true, doc: 'Shape data: 0.5 on flat areas, towards 1 on sharp outer edges, towards 0 in creases. Stored in the mesh (vertex color red) by Inoscula Studio\'s Prepare model.' },
+  object_size: { ins: [], out: one('float'), source: true, doc: 'How big the object is, in meters: the diagonal of its bounding box. Lets a look keep the same number of strokes, tiles or spots on any object. RICO: look.fitTo(obj); Blender: the object property inoscula_object_size (the export sets it); Godot: the instance parameter inoscula_object_size (the light bridge sets it); Unreal: Object Radius; Unity: wire the Object node\'s Bounds Size length. 2.0 when unknown.' },
+  occlusion: { ins: [], out: one('float'), source: true, doc: 'Shape data: 1 in the open, towards 0 in crevices and contact areas. Stored in the mesh (vertex color green).' },
   param: { ins: [], out: one(T), source: true, doc: 'An exposed, editable parameter. set.id names it.' },
   value: { ins: [], out: one(T), source: true, doc: 'A constant. set.v is a number or [x, y, z].' },
 
@@ -112,6 +135,7 @@ export const OPS: Record<string, OpDef> = {
   one_minus: { ins: [['x', T, 0]], out: one(T), doc: '1 - x' },
   exp: { ins: [['x', T, 0]], out: one(T), doc: 'e to the power x.' },
   sqrt: { ins: [['x', T, 0]], out: one(T), doc: 'Square root. Negative numbers give 0.' },
+  log: { ins: [['x', 'float', 1]], out: one('float'), doc: 'Natural logarithm. 0 where x is 0 or less.' },
   mix: { ins: [['a', T, 0], ['b', T, 1], ['t', 'float', 0.5]], out: one(T), doc: 'Blend a to b. t is clamped to 0..1.' },
 
   // float only
@@ -126,11 +150,11 @@ export const OPS: Record<string, OpDef> = {
   combine: { ins: [['x', 'float', 0], ['y', 'float', 0], ['z', 'float', 0]], out: one('vec3'), doc: '' },
   separate: { ins: [['v', 'vec3', 0]], out: { x: 'float', y: 'float', z: 'float' }, doc: '' },
 
-  // pattern and colour
+  // pattern and color
   noise: {
     ins: [['p', 'vec3', 0], ['scale', 'float', 5], ['detail', 'float', 2], ['roughness', 'float', 0.5], ['lacunarity', 'float', 2]],
     out: one('float'),
-    doc: 'Gradient noise, fractal, 0..1. Bit-for-bit the same maths as Blender\'s Noise Texture (3D, fBM, normalised).',
+    doc: 'Gradient noise, fractal, 0..1. Bit-for-bit the same maths as Blender\'s Noise Texture (3D, fBM, normalized).',
   },
   white_noise: {
     ins: [['p', 'vec3', 0]],
@@ -140,12 +164,12 @@ export const OPS: Record<string, OpDef> = {
   voronoi: {
     ins: [['p', 'vec3', 0], ['scale', 'float', 5], ['randomness', 'float', 1]],
     out: { out: 'float', color: 'vec3', position: 'vec3' },
-    doc: 'Cells. Main output: distance to the nearest cell point (F1, Euclidean). .color: a random colour per cell. .position: the cell point. Same maths as Blender\'s Voronoi Texture (3D, F1, Euclidean).',
+    doc: 'Cells. Main output: distance to the nearest cell point (F1, Euclidean). .color: a random color per cell. .position: the cell point. Same maths as Blender\'s Voronoi Texture (3D, F1, Euclidean).',
   },
   ramp: {
     ins: [['t', 'float', 0.5]],
     out: one('vec3'),
-    doc: 'Colour ramp. set.mode is "linear" or "constant", set.stops is [[position, [r, g, b]], ...].',
+    doc: 'Color ramp. set.mode is "linear" or "constant", set.stops is [[position, [r, g, b]], ...].',
   },
 }
 
@@ -179,7 +203,9 @@ export interface IR {
   /** Optional layers, null when unused. */
   /** The graph this came from, so every export can carry it and be read back. */
   source: Graph
-  outline: { width: Arg; color: Arg; breakup: Arg; rings: number } | null
+  outline: { width: Arg; color: Arg; breakup: Arg; rings: number; offset: Arg; boil: Arg } | null
+  /** Glass (see Graph.output.glass), null when unused. */
+  glass: { amount: Arg; ior: Arg; dispersion: Arg } | null
   layers: { coat: Arg | null; coat_roughness: Arg | null; sheen: Arg | null; sheen_color: Arg | null; sheen_roughness: Arg | null; subsurface: Arg | null }
   uses: Set<string> // source ops used, so targets only declare what they need
 }
@@ -192,6 +218,11 @@ export const safeId = (s: string) => {
   return id || '_'
 }
 
+// a parameter's tooltip: its own description, and what each number means for an on/off switch or a list
+export function paramDesc(p: { desc?: string; ui?: string; options?: string[] }) {
+  const what = p.ui === 'toggle' ? '0 = off, 1 = on' : p.ui === 'menu' && p.options ? p.options.map((o, i) => `${i} = ${o}`).join(', ') : ''
+  return [p.desc, what].filter(Boolean).join('. ')
+}
 export function check(g: Graph): IR {
   if (g.inoscula !== '0.1') throw new InosculaError(`Unknown format version "${g.inoscula}". This reader understands 0.1.`)
   const params = (g.params ?? []).map((p) => {
@@ -278,7 +309,7 @@ export function check(g: Graph): IR {
     return step
   }
 
-  const color = promote(wire(g.output.color, 'Output colour'), 'vec3', 'Output colour')
+  const color = promote(wire(g.output.color, 'Output color'), 'vec3', 'Output color')
   let alpha = g.output.alpha === undefined ? null : promote(wire(g.output.alpha, 'Output alpha'), 'float', 'Output alpha')
   if (alpha?.k === 'lit' && alpha.v === 1) alpha = null
   const o = g.output
@@ -293,15 +324,17 @@ export function check(g: Graph): IR {
   const emission = opt(o.emission, 'vec3', 'Output emission')
   const layers = {
     coat: opt(o.coat, 'float', 'Output coat'), coat_roughness: opt(o.coat_roughness, 'float', 'Output coat roughness'),
-    sheen: opt(o.sheen, 'float', 'Output sheen'), sheen_color: opt(o.sheen_color, 'vec3', 'Output sheen colour'),
+    sheen: opt(o.sheen, 'float', 'Output sheen'), sheen_color: opt(o.sheen_color, 'vec3', 'Output sheen color'),
     sheen_roughness: opt(o.sheen_roughness, 'float', 'Output sheen roughness'), subsurface: opt(o.subsurface, 'float', 'Output subsurface'),
   }
   let outline: IR['outline'] = null
   if (o.outline !== undefined) {
     const width = promote(wire(o.outline, 'Outline width'), 'float', 'Outline width')
-    const ocol = o.outline_color === undefined ? { k: 'lit', v: [0.02, 0.02, 0.03], type: 'vec3' } as Arg : promote(wire(o.outline_color, 'Outline colour'), 'vec3', 'Outline colour')
+    const ocol = o.outline_color === undefined ? { k: 'lit', v: [0.02, 0.02, 0.03], type: 'vec3' } as Arg : promote(wire(o.outline_color, 'Outline color'), 'vec3', 'Outline color')
     const breakup = o.outline_breakup === undefined ? { k: 'lit', v: 0, type: 'float' } as Arg : promote(wire(o.outline_breakup, 'Outline breakup'), 'float', 'Outline breakup')
-    for (const [a, what] of [[width, 'outline'], [ocol, 'outline_color'], [breakup, 'outline_breakup']] as const) {
+    const offset = o.outline_offset === undefined ? { k: 'lit', v: 0, type: 'float' } as Arg : promote(wire(o.outline_offset, 'Outline offset'), 'float', 'Outline offset')
+    const boil = o.outline_boil === undefined ? { k: 'lit', v: 0, type: 'float' } as Arg : promote(wire(o.outline_boil, 'Outline boil'), 'float', 'Outline boil')
+    for (const [a, what] of [[width, 'outline'], [ocol, 'outline_color'], [breakup, 'outline_breakup'], [offset, 'outline_offset'], [boil, 'outline_boil']] as const) {
       if (a.k === 'ref' && !a.id.startsWith('p_')) throw new InosculaError(`${what} must be a fixed value or a parameter (it sets a modifier or a second pass, which cannot change across the surface). Make it a uniform.`)
     }
     let rings = 0
@@ -309,9 +342,19 @@ export function check(g: Graph): IR {
       if (typeof o.outline_rings !== 'number') throw new InosculaError('outline_rings must be a plain number (0 to 4).')
       rings = Math.max(0, Math.min(4, Math.round(o.outline_rings)))
     }
-    outline = { width, color: ocol, breakup, rings }
+    outline = { width, color: ocol, breakup, rings, offset, boil }
   }
-  return { name: g.name, params, steps, color, alpha, uses, lit, cutout: g.surface === 'cutout', roughness, metallic, bump, emission, layers, outline, source: g }
+  let glass: IR['glass'] = null
+  if (o.glass !== undefined) {
+    const amount = promote(wire(o.glass, 'Output glass'), 'float', 'Output glass')
+    if (!(amount.k === 'lit' && amount.v === 0)) {
+      const ior = o.ior === undefined ? { k: 'lit', v: 1.45, type: 'float' } as Arg : promote(wire(o.ior, 'Output ior'), 'float', 'Output ior')
+      const dispersion = o.dispersion === undefined ? { k: 'lit', v: 0, type: 'float' } as Arg : promote(wire(o.dispersion, 'Output dispersion'), 'float', 'Output dispersion')
+      glass = { amount, ior, dispersion }
+    }
+  } else if (o.ior !== undefined || o.dispersion !== undefined) throw new InosculaError('ior and dispersion only do something on glass. Set "glass = ..." too.')
+  if (glass && g.surface === 'cutout') throw new InosculaError('Glass and a cutout surface do not go together. Use alpha for holes, or drop the cutout.')
+  return { name: g.name, params, steps, color, alpha, uses, lit, cutout: g.surface === 'cutout', roughness, metallic, bump, emission, layers, outline, glass, source: g }
 }
 
 function checkRamp(set: Record<string, unknown>, where: string) {

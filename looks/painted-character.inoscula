@@ -1,7 +1,7 @@
 // Painted character: shadow, midtone and highlight brushes
 name "Painted Character";
 
-uniform vec3 baseColor = vec3(0.72, 0.42, 0.36);    // @color @label Base Colour
+uniform vec3 baseColor = vec3(0.72, 0.42, 0.36);    // @color @label Base Color
 uniform vec3 shadowTint = vec3(0.32, 0.2, 0.5);       // @color @label Shadow Tint
 uniform vec3 highlightTint = vec3(1.0, 0.86, 0.7);  // @color @label Highlight Tint
 uniform float shadowEdge = 0.55;                     // @range 0 1 @label Shadow Edge
@@ -12,7 +12,7 @@ uniform float midBrush = 10.0;                       // @range 1 20 @label Midto
 uniform float highlightBrush = 14.0;                 // @range 1 30 @label Highlight Brush Size
 uniform float brushEdge = 0.32;                      // @range 0 0.5 @label Brush Edge Breakup
 uniform float lineWidth = 0.007;                     // @range 0 0.05 @label Outline Width
-uniform vec3 lineColor = vec3(0.12, 0.06, 0.1);     // @color @label Outline Colour
+uniform vec3 lineColor = vec3(0.12, 0.06, 0.1);     // @color @label Outline Color
 
 float brush(vec3 p, vec3 dir, float size) {
   float a = dot(p, dir);

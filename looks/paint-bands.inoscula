@@ -1,11 +1,11 @@
 // Paint bands: light in flat painted bands
 name "Paint Bands";
 
-uniform vec3 sunCol = vec3(1.0, 0.82, 0.58);      // @color @label Sun Colour
-uniform vec3 skyCol = vec3(0.35, 0.55, 0.95);     // @color @label Sky Colour
-uniform vec3 base = vec3(0.82, 0.22, 0.30);       // @color @label Base Colour
-uniform vec3 shadowCol = vec3(0.16, 0.07, 0.25);  // @color @label Shadow Colour
-uniform vec3 rimCol = vec3(0.4, 1.0, 0.85);       // @color @label Rim Colour
+uniform vec3 sunCol = vec3(1.0, 0.82, 0.58);      // @color @label Sun Color
+uniform vec3 skyCol = vec3(0.35, 0.55, 0.95);     // @color @label Sky Color
+uniform vec3 base = vec3(0.82, 0.22, 0.30);       // @color @label Base Color
+uniform vec3 shadowCol = vec3(0.16, 0.07, 0.25);  // @color @label Shadow Color
+uniform vec3 rimCol = vec3(0.4, 1.0, 0.85);       // @color @label Rim Color
 uniform float bands = 3.0;                         // @range 1 6 @label Light Bands
 uniform float brush = 0.45;                        // @range 0 1 @label Brushy Edges
 uniform float painted = 0.35;                      // @range 0 1 @label Painted Normals

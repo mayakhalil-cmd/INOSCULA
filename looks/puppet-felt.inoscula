@@ -3,7 +3,7 @@ name "Puppet Felt";
 
 uniform vec3 felt = vec3(0.20, 0.36, 0.30);   // @color @label Felt
 uniform vec3 fuzzCol = vec3(0.72, 0.86, 0.78); // @color @label Fuzz
-uniform float fibre = 40.0;                    // @range 10 120 @label Fibre Scale
+uniform float fiber = 40.0;                    // @range 10 120 @label Fiber Scale
 uniform float fuzz = 0.8;                      // @range 0 2 @label Fuzz
 uniform float fps = 12.0;                      // @range 1 24 @label Frames Per Second
 
@@ -12,9 +12,9 @@ void main() {
   vec3 shift = vec3(hash(vec3(frame, 7.0, 0.0)), hash(vec3(frame, 8.0, 0.0)), 0.0) * 0.3;
   vec3 p = object_pos;
 
-  // Matted fibres
-  float f1 = noise(p * vec3(1.0, 6.0, 1.0) + shift, fibre, 2.0, 0.6, 2.0);
-  float f2 = noise(p * vec3(6.0, 1.0, 1.0) - shift, fibre, 2.0, 0.6, 2.0);
+  // Matted fibers
+  float f1 = noise(p * vec3(1.0, 6.0, 1.0) + shift, fiber, 2.0, 0.6, 2.0);
+  float f2 = noise(p * vec3(6.0, 1.0, 1.0) - shift, fiber, 2.0, 0.6, 2.0);
   float mat = f1 * 0.5 + f2 * 0.5;
   float clump = noise(p, 4.0, 3.0, 0.5, 2.0);
 

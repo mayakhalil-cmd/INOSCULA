@@ -10,7 +10,7 @@ uniform float strokeLength = 3.0;                    // @range 1 8 @label Stroke
 uniform float painterlyNormals = 0.3;                // @range 0 2 @label Painterly Normals Strength
 uniform float shine = 24.0;                          // @range 2 80 @label Highlight Tightness
 uniform float lineWidth = 0.006;                     // @range 0 0.05 @label Outline Width
-uniform vec3 lineColor = vec3(0.08, 0.05, 0.1);     // @color @label Outline Colour
+uniform vec3 lineColor = vec3(0.08, 0.05, 0.1);     // @color @label Outline Color
 
 // One stroke's random tilt
 vec3 tilt(vec3 p, vec3 dir, float size, float len) {

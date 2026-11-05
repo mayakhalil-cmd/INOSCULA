@@ -1,6 +1,6 @@
 # Outer rim and offset outlines for Blender: adds three copies of the selected mesh, inflated along its smooth
 # normals (so sharp edges stay closed), the two outlines also shifted a little at random. Their normals point
-# inwards and their UVs say which is which (u = 200.5 rim, 201.5 and 202.5 outlines), so a Inoscula look made for
+# inwards and their UVs say which is which (u = 200.5 rim, 201.5 and 202.5 outlines), so an Inoscula look made for
 # them (Wet Stroke) draws them with the same material, as Inoscula Studio does (src/cards.ts paintShells).
 # Run it from the Text Editor with your model selected.
 import bpy, bmesh, json, random

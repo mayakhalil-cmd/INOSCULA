@@ -61,7 +61,7 @@ export function brushCards(pos: ArrayLike<number>, nrm: ArrayLike<number>, idx: 
   let lo: V = [Infinity, Infinity, Infinity], hi: V = [-Infinity, -Infinity, -Infinity]
   for (let i = 0; i < pos.length / 3; i++) { const p = P(i); lo = [Math.min(lo[0], p[0]), Math.min(lo[1], p[1]), Math.min(lo[2], p[2])]; hi = [Math.max(hi[0], p[0]), Math.max(hi[1], p[1]), Math.max(hi[2], p[2])] }
   const size = Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) || 1
-  const centre = mul(add(lo, hi), 0.5)
+  const center = mul(add(lo, hi), 0.5)
   const area = new Float64Array(tris)
   let total = 0
   for (let t = 0; t < tris; t++) { const a = P(T(t, 0)); total += Math.hypot(...cross(sub(P(T(t, 1)), a), sub(P(T(t, 2)), a))) / 2; area[t] = total }
@@ -88,7 +88,7 @@ export function brushCards(pos: ArrayLike<number>, nrm: ArrayLike<number>, idx: 
     const dir = norm(add(mul(around, Math.cos(ang)), mul(side, Math.sin(ang))))
     const acr = cross(n, dir)
     // how strongly the surface curves here, guessed from the distance to the middle of the model
-    const radius = Math.max(Math.hypot(...sub(p, centre)), len * 0.5)
+    const radius = Math.max(Math.hypot(...sub(p, center)), len * 0.5)
     const L = len * (0.7 + rnd() * 0.6), W = wid * (0.75 + rnd() * 0.5), lift1 = lift * (0.5 + rnd())
     const id = Math.floor(rnd() * 64)
     const base = outP.length / 3
@@ -115,7 +115,7 @@ export interface ShellOptions {
   rim?: number
   /** How far the two offset outlines are inflated, as a fraction of the model's size. */
   outline?: number
-  /** How far each outline is shifted off centre, as a fraction of the model's size. */
+  /** How far each outline is shifted off center, as a fraction of the model's size. */
   offset?: number
   seed?: number
 }

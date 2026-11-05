@@ -38,7 +38,9 @@ for (const [k, name] of names.entries()) {
     const i = (y * size + x) * 4, j = i // same row order once the UV flip in the shader is undone
     if (!(blend[i + 3] > 0.5 && g[j + 3] > 0.5)) continue
     n++
-    const d = Math.max(Math.abs(blend[i] - g[j]), Math.abs(blend[i + 1] - g[j + 1]), Math.abs(blend[i + 2] - g[j + 2]))
+    // as shown on screen: anything past 1 is white either way (glow shaders go far past it)
+    const c = (v: number) => Math.min(1, Math.max(0, v))
+    const d = Math.max(Math.abs(c(blend[i]) - c(g[j])), Math.abs(c(blend[i + 1]) - c(g[j + 1])), Math.abs(c(blend[i + 2]) - c(g[j + 2])))
     max = Math.max(max, d); sum += d; if (d < 0.5 / 255) same++; if (d < 2 / 255) close++
   }
   const row = { engine: 'Godot 4.5.1 ' + (process.env.GODOT_ARGS?.includes('vulkan') ? 'Forward+ (Vulkan)' : 'Compatibility (OpenGL)'), shader: name, texels: n, identical_8bit: `${(100 * same / n).toFixed(3)}%`, within_2_of_255: `${(100 * close / n).toFixed(3)}%`, mean_diff: (sum / n).toExponential(2), max_diff: max.toExponential(2) }

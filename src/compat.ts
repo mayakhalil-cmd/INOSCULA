@@ -9,17 +9,17 @@ export function compat(ir: IR, t: Target, o: { substrate?: boolean } = {}): Note
   const n: Note[] = []
   const L = ir.layers
   if (!ir.lit) {
-    n.push({ level: 'same', text: 'Unlit: the colour is computed the same way everywhere, to the pixel.' })
+    n.push({ level: 'same', text: 'Unlit: the color is computed the same way everywhere, to the pixel.' })
     const tm: Record<Target, string> = {
-      blender: 'Blender shows it through its view transform (AgX by default). Set Color Management > View Transform to Standard for the exact colours.',
-      unreal: 'Unreal passes unlit colour through its tonemapper. For exact colours, use a post process volume with the tonemapper set to neutral, or view in Unlit mode.',
-      godot: 'Godot\'s default tonemap is Linear, so colours match as they are.',
-      unity: 'Unity shows the colour as it is unless a post process volume adds tonemapping.',
-      rico: 'RICO shows the colour as it is.',
+      blender: 'Blender shows it through its view transform (AgX by default). Set Color Management > View Transform to Standard for the exact colors.',
+      unreal: 'Unreal passes unlit color through its tonemapper. For exact colors, use a post process volume with the tonemapper set to neutral, or view in Unlit mode.',
+      godot: 'Godot\'s default tonemap is Linear, so colors match as they are.',
+      unity: 'Unity shows the color as it is unless a post process volume adds tonemapping.',
+      rico: 'RICO shows the color as it is.',
     }
     n.push({ level: t === 'godot' || t === 'unity' || t === 'rico' ? 'same' : 'close', text: tm[t] })
   } else {
-    n.push({ level: 'same', text: 'Base colour, roughness, metallic, bumps and emission are computed the same way everywhere.' })
+    n.push({ level: 'same', text: 'Base color, roughness, metallic, bumps and emission are computed the same way everywhere.' })
     n.push({ level: 'close', text: 'Lighting is the tool\'s own, so expect the differences you would see between these renderers with any material.' })
     if (ir.bump && t === 'unreal') n.push({ level: 'same', text: 'Bumps come out as a world space normal; the material is set to accept one.' })
     if (L.coat) {

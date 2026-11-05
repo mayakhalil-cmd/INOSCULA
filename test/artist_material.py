@@ -1,4 +1,4 @@
-# A material built by hand in plain Blender nodes, not by Inoscula: noise on object coordinates, a constant colour
+# A material built by hand in plain Blender nodes, not by Inoscula: noise on object coordinates, a constant color
 # ramp, light-facing bands from the Geometry normal, mixed with RGB nodes into an Emission. Used by the tests to
 # prove Blender -> Inoscula -> other engines.
 import bpy

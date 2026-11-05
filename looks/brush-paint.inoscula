@@ -14,7 +14,7 @@ uniform float impasto = 1.6;                         // @range 0 4 @label Impast
 uniform float fps = 8.0;                             // @range 0 24 @label Repaint FPS
 uniform float boil = 1.0;                            // @range 0 1 @label Repaint Amount
 uniform float lineWidth = 0.012;                     // @range 0 0.05 @label Outline Width
-uniform vec3 lineColor = vec3(0.03, 0.02, 0.04);    // @color @label Outline Colour
+uniform vec3 lineColor = vec3(0.03, 0.02, 0.04);    // @color @label Outline Color
 uniform float lineBreakup = 0.35;                    // @range 0 0.9 @label Outline Breakup
 
 // One stroke field

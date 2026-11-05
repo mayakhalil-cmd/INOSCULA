@@ -1,4 +1,4 @@
-// Paint with light: light picks the colour
+// Paint with light: light picks the color
 name "Paint With Light";
 
 uniform vec3 shadowHue = vec3(0.08, 0.1, 0.32);     // @color @label Shadow
@@ -11,7 +11,7 @@ uniform float strokeRotation = 0.6;                  // @range 0 3.1416 @label S
 uniform float complexity = 3.0;                      // @range 1 6 @label Stroke Complexity
 uniform float crunchiness = 0.6;                     // @range 0 1 @label Crunchiness
 uniform float strokeAmount = 0.35;                   // @range 0 1 @label Stroke Strength
-uniform float lightTint = 0.6;                       // @range 0 1 @label Light Colour Tint
+uniform float lightTint = 0.6;                       // @range 0 1 @label Light Color Tint
 
 void main() {
   // Strokes
@@ -23,7 +23,7 @@ void main() {
   float edge = mix(0.3, 0.02, crunchiness);
   s = smoothstep(0.5 - edge, 0.5 + edge, s);
 
-  // Light picks the colour
+  // Light picks the color
   float l = max(dot(normal, light_dir), 0.0) * length(light_color) * 0.577;
   float t = saturate(l * 0.9 + 0.05 + (s - 0.5) * strokeAmount);
   vec3 c = mix(shadowHue, coolHue, smoothstep(0.0, 0.25, t));

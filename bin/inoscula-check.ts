@@ -79,7 +79,7 @@ const B = (x, y, z) => new THREE.Vector3(x, z, -y) // Blender to three
 const r = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true, preserveDrawingBuffer: true })
 r.toneMapping = THREE.AgXToneMapping; r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap
 const scene = new THREE.Scene(); scene.background = new THREE.Color().setRGB(0.35, 0.42, 0.55)
-{ // an even sky, like Blender's world colour: lights and reflects
+{ // an even sky, like Blender's world color: lights and reflects
   // the floor blocks the lower half, as it does in Cycles and Godot: without that, undersides glow
   const s = new THREE.Scene(); s.background = new THREE.Color().setRGB(0.35 * 0.6, 0.42 * 0.6, 0.55 * 0.6)
   const under = new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(0.07, 0.07, 0.07), side: THREE.BackSide })); s.add(under)
@@ -88,8 +88,9 @@ const scene = new THREE.Scene(); scene.background = new THREE.Color().setRGB(0.3
 const sun = new THREE.DirectionalLight(0xffffff, 3.5); sun.position.copy(B(-0.5, -0.6, 0.62).normalize().multiplyScalar(8)); sun.castShadow = true
 sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4 }); sun.shadow.bias = -0.0002; sun.shadow.normalBias = 0.03; sun.shadow.camera.near = 2; sun.shadow.camera.far = 16
 scene.add(sun, sun.target)
-const u = {}; for (const [k, v] of Object.entries(sh.uniforms)) u[k] = { value: Array.isArray(v) ? new THREE.Vector3(...v) : v }
+const u = {}; for (const [k, v] of Object.entries(sh.uniforms)) u[k] = { value: Array.isArray(v) ? (v.length === 2 ? new THREE.Vector2(...v) : new THREE.Vector3(...v)) : v }
 u.inoscula_light_dir.value.copy(sun.position).normalize()
+if (${Boolean(ir.glass)}) u.inoscula_behind = { value: null }
 let mat
 if (lit) {
   const edits = sh.litEdits
@@ -122,6 +123,14 @@ const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStan
 }
 const cam = new THREE.PerspectiveCamera(2 * Math.atan(Math.tan(Math.atan(18 / 50)) / (4 / 3)) * 180 / Math.PI, 4 / 3, 0.1, 100)
 cam.position.copy(B(0, -6.2, 1.6)); cam.lookAt(B(0, 0, 0.9))
+if (${Boolean(ir.glass)}) { // glass: the scene without the glass objects, for the glass to bend
+  const sz = r.getDrawingBufferSize(new THREE.Vector2())
+  const rt = new THREE.WebGLRenderTarget(sz.x, sz.y, { type: THREE.HalfFloatType, samples: 4 })
+  const hide = []; scene.traverse((o) => { if (o.isMesh && o.visible && (o.material === mat || o.parent === ball || o.parent === box)) { o.visible = false; hide.push(o) } })
+  r.setRenderTarget(rt); r.render(scene, cam); r.setRenderTarget(null)
+  for (const o of hide) o.visible = true
+  u.inoscula_behind.value = rt.texture; u.inoscula_screen_inv.value.set(1 / sz.x, 1 / sz.y)
+}
 r.render(scene, cam)
 window.shot = document.getElementById('c').toDataURL('image/png')
 window.sheet = async (items) => {

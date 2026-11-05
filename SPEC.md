@@ -1,7 +1,7 @@
 # Inoscula format, version 0.1
 
 A Inoscula shader is one JSON file. This document is the whole format: anyone may write a reader or a writer
-for it, in any tool, under any licence.
+for it, in any tool, under any license.
 
 ## The file
 
@@ -30,12 +30,14 @@ for it, in any tool, under any licence.
   number, or `[x, y, z]`. An input left out uses its default.
 - **shading**: `"unlit"` (default) or `"lit"`.
 - **output**: `color` (required) and `alpha` (optional, 0 to 1). Lit shaders also take `roughness`, `metallic`,
-  `bump` (height in metres), `emission`, and the layers `coat`, `coat_roughness`, `sheen`, `sheen_color`,
-  `sheen_roughness` and `subsurface`, named as in OpenPBR.
+  `bump` (height in meters), `emission`, and the layers `coat`, `coat_roughness`, `sheen`, `sheen_color`,
+  `sheen_roughness` and `subsurface`, named as in OpenPBR. Any shader can also take `glass` (0 to 1, how much of
+  the scene behind shows through), `ior` (how strongly it bends, 1.45 if left out) and `dispersion` (how far red,
+  green and blue split apart, 0 if left out). See Glass below.
 
 ## Types
 
-There are two: `float` and `vec3` (vectors and colours). A float wired into a vec3 input becomes (f, f, f), as
+There are two: `float` and `vec3` (vectors and colors). A float wired into a vec3 input becomes (f, f, f), as
 it does in every engine. A vec3 is never squashed into a float without asking: use `separate` or `dot`. This
 rule exists because engines disagree about it (Blender averages, Unreal takes the first channel).
 
@@ -44,7 +46,7 @@ the node works per component and outputs a vec3.
 
 ## Space
 
-All positions and directions are in one shared space: Z up, right handed, metres, UV origin at the bottom
+All positions and directions are in one shared space: Z up, right handed, meters, UV origin at the bottom
 left. This is Blender's convention. Each target converts its own inputs into it with one line, so the same
 graph means the same thing everywhere:
 
@@ -64,15 +66,15 @@ back by default.
 |---|---|---|---|---|
 | `uv` | none | vec3 | Texture Coordinate > UV | Mesh UV as (u, v, 0), origin bottom left. |
 | `object_pos` | none | vec3 | Texture Coordinate > Object | Position in the object's own space. Moves with the object. |
-| `world_pos` | none | vec3 | Geometry > Position | Position in world space, metres. |
+| `world_pos` | none | vec3 | Geometry > Position | Position in world space, meters. |
 | `normal` | none | vec3 | Geometry > Normal | World space surface normal. |
 | `object_normal` | none | vec3 | Texture Coordinate > Normal | Object space surface normal. |
 | `view_dir` | none | vec3 | Geometry > Incoming | World space direction from the surface towards the camera. |
 | `time` | none | float | Value with a frame / fps driver | Seconds. |
 | `light_dir` | none | vec3 | Group input, driven by the Sun | Lighting contract: world direction towards the main light. |
-| `light_color` | none | vec3 | Group input, driven by the Sun | Lighting contract: main light colour. |
-| `curvature` | none | float | Color Attribute (red), decoded | Shape data: 0.5 on flat areas, towards 1 on sharp outer edges, towards 0 in creases. Stored in the mesh (vertex colour red) by Inoscula Studio's Prepare model. |
-| `occlusion` | none | float | Color Attribute (green), decoded | Shape data: 1 in the open, towards 0 in crevices and contact areas. Stored in the mesh (vertex colour green). |
+| `light_color` | none | vec3 | Group input, driven by the Sun | Lighting contract: main light color. |
+| `curvature` | none | float | Color Attribute (red), decoded | Shape data: 0.5 on flat areas, towards 1 on sharp outer edges, towards 0 in creases. Stored in the mesh (vertex color red) by Inoscula Studio's Prepare model. |
+| `occlusion` | none | float | Color Attribute (green), decoded | Shape data: 1 in the open, towards 0 in crevices and contact areas. Stored in the mesh (vertex color green). |
 | `param` | none | same as inputs | Group input | An exposed, editable parameter. set.id names it. |
 | `value` | none | same as inputs | Value or Combine XYZ | A constant. set.v is a number or [x, y, z]. |
 | `add` | a, b | same as inputs | Math / Vector Math: Add | a + b |
@@ -100,10 +102,10 @@ back by default.
 | `normalize` | x (vec3) | vec3 | Vector Math: Normalize | Zero stays zero. |
 | `combine` | x (float), y (float), z (float) | vec3 | Combine XYZ |  |
 | `separate` | v (vec3) | x: float, y: float, z: float | Separate XYZ |  |
-| `noise` | p (vec3), scale (float), detail (float), roughness (float), lacunarity (float) | float | Noise Texture (3D, fBM, normalised, no distortion) | Gradient noise, fractal, 0..1. Bit-for-bit the same maths as Blender's Noise Texture (3D, fBM, normalised). |
+| `noise` | p (vec3), scale (float), detail (float), roughness (float), lacunarity (float) | float | Noise Texture (3D, fBM, normalized, no distortion) | Gradient noise, fractal, 0..1. Bit-for-bit the same maths as Blender's Noise Texture (3D, fBM, normalized). |
 | `white_noise` | p (vec3) | float | White Noise Texture (3D) > Value | A random number 0..1 for each exact point. Use floor() first for cells, flicker or grain that holds still. Same hash as Blender's White Noise Texture. |
-| `voronoi` | p (vec3), scale (float), randomness (float) | float, color: vec3, position: vec3 | Voronoi Texture (3D, F1, Euclidean) | Cells. Main output: distance to the nearest cell point (F1, Euclidean). .color: a random colour per cell. .position: the cell point. Same maths as Blender's Voronoi Texture (3D, F1, Euclidean). |
-| `ramp` | t (float) | vec3 | Color Ramp (Linear or Constant) | Colour ramp. set.mode is "linear" or "constant", set.stops is [[position, [r, g, b]], ...]. |
+| `voronoi` | p (vec3), scale (float), randomness (float) | float, color: vec3, position: vec3 | Voronoi Texture (3D, F1, Euclidean) | Cells. Main output: distance to the nearest cell point (F1, Euclidean). .color: a random color per cell. .position: the cell point. Same maths as Blender's Voronoi Texture (3D, F1, Euclidean). |
+| `ramp` | t (float) | vec3 | Color Ramp (Linear or Constant) | Color ramp. set.mode is "linear" or "constant", set.stops is [[position, [r, g, b]], ...]. |
 
 ## Inoscula code
 
@@ -124,13 +126,27 @@ void main() {
   Scissor in Godot, a Masked two-sided material in Unreal, a Greater Than node on the alpha in Blender.
 - `outline_rings = 3.0;` turns the outline into that many thin, loose lines floating around the shape at
   different offsets (0 to 4, a fixed number).
+- `outline_offset = 0.03;` lifts the outline off the surface by that many meters, with a gap in between.
+  `outline_boil = 8.0;` redraws the outline's breakup that many times a second, like hand drawn line boil (0
+  holds still). Both can come from uniforms, so they can be animated from any tool.
 - `cards 3500, 0.06, 0.34;` says the look is made for brush cards: how many strokes, their length as a fraction
   of the model's size, and their width as a fraction of their length (graph field `"cards"`).
 - Your own functions: `float bands(float x, float n) { ...; return ...; }`. They are copied in where used, so they
   still become plain nodes; a function cannot call itself.
-- `uniform` lines are parameters. Comments on the same line set `@color`, `@range lo hi` and `@label Name`.
+- `uniform` lines are parameters. A comment on the same line says how each one looks in every tool:
+  - `@label Name` the name people see (and the name the live link matches on);
+  - `@range lo hi` a slider's limits; `@step 1` makes it move in whole steps (buttons for small counts);
+  - `@color` a color picker (for `vec3`);
+  - `@toggle` an on and off switch (a `float` that is 0 or 1);
+  - `@options Soft | Hard | Wet` a menu (a `float`: the first choice is 0, the next 1, and so on);
+  - `@group Name` puts it in its own section in Inoscula Studio;
+  - `@desc Text` a line of help shown when you point at it.
+
+  For example `uniform float style = 0.0;  // @options Soft | Hard @label Edge @group Edges @desc How the edge is cut`.
+  Every tool gets a plain number underneath, so these always travel: in programs without switches or menus
+  (Blender's node groups, for example) a switch is a 0 to 1 value and a menu is a value from 0 to the last choice.
 - Inputs: `uv object_pos object_normal world_pos normal view_dir time light_dir light_color curvature occlusion
-  object_size`, plus `PI` and `TAU`. `object_size` is the diagonal of the object's bounding box in metres (2.0
+  object_size`, plus `PI` and `TAU`. `object_size` is the diagonal of the object's bounding box in meters (2.0
   where a tool cannot tell).
 - Functions are the nodes above by name, plus `atan(y, x)`, `hash(p)` (white noise), `step`, `saturate`, `mod`,
   `sign`, `reflect`, `distance` and `radians`, which become a few plain nodes each.
@@ -164,11 +180,11 @@ Rules that make it exact:
 
 `light_dir` (world direction towards the main light) and `light_color` are inputs every target must provide.
 Each target ships a bridge that keeps them following the scene's main light. This is what lets light-reactive,
-stylised shading travel between tools without relying on any one renderer's lighting.
+stylized shading travel between tools without relying on any one renderer's lighting.
 
 ## Lit shading
 
-In a lit shader `color` is the base colour of a physically based material, and each tool lights it with its own
+In a lit shader `color` is the base color of a physically based material, and each tool lights it with its own
 renderer:
 
 | Output | Blender | Unreal | Godot | Unity URP | RICO / three.js |
@@ -179,9 +195,27 @@ renderer:
 | sheen | Sheen Weight, Tint, Roughness | Substrate fuzz | rim light (closest) | none in URP | sheen |
 | subsurface | Subsurface Weight | not wired yet | SSS_STRENGTH | none in URP | none |
 
+## Glass
+
+`glass` mixes the surface with the scene behind it. The scene behind is read a little to the side, along the
+surface's view space normal, by (ior - 1) x 0.2 of the screen, and red and blue are read
+dispersion x 0.5 of that further in and out, so the edges split like a prism. Unlit: the color becomes
+mix(color, behind, glass). Lit: the base color is multiplied by (1 - glass) and behind times glass is added to the
+emission, so the reflections stay on top.
+
+| Tool | How |
+|---|---|
+| Unreal | Translucent material, three Scene Color nodes in Offset Fraction mode, view space normal from a Transform node. Not with Substrate yet. |
+| Godot | Shader code export: `hint_screen_texture` and SCREEN_UV. The VisualShader export stops with an error. |
+| Blender | Mix Shader with three Refraction BSDFs (red, green, blue, IORs spread by the dispersion). Cycles as is; Eevee turns on raytraced refraction. |
+| Unity URP | Glass, GlassIOR and GlassDispersion come out of the function; the Scene Color mix is not wired yet. |
+| RICO / three.js | `look.renderBehind(renderer, scene, camera)` each frame draws the scene without the glass into a texture. |
+
+Glass never sees itself: parts of the same object behind the glass do not show through it, in any tool.
+
 ## Shape data
 
-`curvature` and `occlusion` come from the mesh's vertex colour: red is curvature (0.5 flat, 1 sharp edge, 0
+`curvature` and `occlusion` come from the mesh's vertex color: red is curvature (0.5 flat, 1 sharp edge, 0
 crease), green is occlusion (1 open, 0 enclosed), and blue 0.5 marks the data as Inoscula's. A mesh without it
 (white in Godot, Unreal and Unity, black in Blender) reads as flat and open in every tool. Inoscula Studio's
 Prepare model writes it, and Save model exports it in a .glb.

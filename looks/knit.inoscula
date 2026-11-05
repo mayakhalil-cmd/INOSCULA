@@ -15,8 +15,8 @@ void main() {
   float y = fract(v);
 
   // Each stitch is two slanted legs
-  float centre = 0.12 + 0.62 * y;
-  float leg = 1.0 - smoothstep(0.0, 0.32, abs(x - centre));
+  float center = 0.12 + 0.62 * y;
+  float leg = 1.0 - smoothstep(0.0, 0.32, abs(x - center));
   // Yarn twist
   float ply = 0.5 + 0.5 * sin((y * 3.0 - x * 2.0) * 9.0);
   float yarnHeight = leg * (0.8 + 0.2 * ply);

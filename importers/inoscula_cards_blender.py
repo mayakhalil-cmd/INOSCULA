@@ -1,9 +1,9 @@
 # Brush cards for Blender: lays single brush strokes over the selected mesh, lifted just off the surface so they
 # overlap and break the silhouette, the same way Inoscula Studio does (src/cards.ts). Run it from the Text Editor
 # with your model selected. It makes "<model> Brush Cards", parented to the model, with the model's first
-# material on it, so a Inoscula look made for cards (Oil Strokes) draws a stroke on each card.
+# material on it, so an Inoscula look made for cards (Oil Strokes) draws a stroke on each card.
 #
-# Change the numbers below, or set them from a Inoscula look: a look with "cards 3500, 0.06, 0.34;" stores them
+# Change the numbers below, or set them from an Inoscula look: a look with "cards 3500, 0.06, 0.34;" stores them
 # in its graph, and the Blender export of that look keeps them on the material as "inoscula_cards".
 import bpy, bmesh, json, math, random
 from mathutils import Vector
@@ -37,7 +37,7 @@ pts = [v.co.copy() for v in bm.verts]
 lo = Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)))
 hi = Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
 size = (hi - lo).length or 1.0
-centre = (lo + hi) * 0.5
+center = (lo + hi) * 0.5
 areas, total = [], 0.0
 for f in tris:
     total += f.calc_area()
@@ -66,7 +66,7 @@ for c in range(COUNT):
     ang = (rng.random() - 0.5) * (0.6 + SCATTER * 2.6)
     d = (around * math.cos(ang) + side * math.sin(ang)).normalized()
     acr = n.cross(d)
-    radius = max((p - centre).length, L0 * 0.5)
+    radius = max((p - center).length, L0 * 0.5)
     L, W, lift = L0 * (0.7 + rng.random() * 0.6), W0 * (0.75 + rng.random() * 0.5), lift0 * (0.5 + rng.random())
     cid = math.floor(rng.random() * 64)
     base = len(verts)

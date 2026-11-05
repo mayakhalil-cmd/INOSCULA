@@ -42,7 +42,7 @@ def _value(sock):
 
 
 def apply(msg):
-    """Set a parameter from a Inoscula Live message on every material that uses that Inoscula graph."""
+    """Set a parameter from an Inoscula Live message on every material that uses that Inoscula graph."""
     hits = 0
     for group, graph in _graphs().items():
         if graph.get("name") != msg.get("material"):

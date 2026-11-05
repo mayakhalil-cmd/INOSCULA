@@ -1,0 +1,54 @@
+// Retro bits: pixel art shading in 8, 16 or 32 bit color, with ordered (Bayer) dithering.
+// The pixels sit on the object, not the screen: each face is cut into square cells along its main axis.
+name "Retro Bits";
+
+uniform vec3 shadow = vec3(0.05, 0.03, 0.16);     // @color @label Shadow Color
+uniform vec3 base = vec3(0.75, 0.22, 0.16);       // @color @label Base Color
+uniform vec3 light = vec3(1.0, 0.86, 0.45);       // @color @label Highlight Color
+uniform float bits = 0.0;                         // @range 0 2 @label Bits (0 = 8, 1 = 16, 2 = 32)
+uniform float pixels = 64.0;                      // @range 8 160 @label Pixels Across
+uniform float dither = 1.0;                       // @range 0 1 @label Dither
+uniform float wrap = 0.35;                        // @range 0 1 @label Light Wrap
+
+// a 2 x 2 Bayer matrix, (0 2 / 3 1), from a cell's x and y (each 0 or 1)
+float bayer2(float x, float y) {
+  return 2.0 * x + 3.0 * y - 4.0 * x * y;
+}
+
+// snap a color to n levels per channel, nudged by the dither so the in-between shades become patterns
+vec3 levels(vec3 c, vec3 n, float d) {
+  vec3 s = sqrt(saturate(c));
+  vec3 q = saturate(floor(s * (n - 1.0) + 0.5 + d) / (n - 1.0));
+  return q * q;
+}
+
+void main() {
+  // which era: 0 = 8 bit, 1 = 16 bit, 2 = 32 bit
+  float era = floor(clamp(bits, 0.0, 2.0) + 0.5);
+  float is8 = era < 0.5 ? 1.0 : 0.0;
+  float is32 = era > 1.5 ? 1.0 : 0.0;
+
+  // cells on the object: more of them, and finer, in the later eras
+  float across = pixels * (is8 > 0.5 ? 1.0 : (is32 > 0.5 ? 4.0 : 2.0));
+  vec3 p = object_pos / object_size * across;
+  vec3 an = abs(object_normal);
+  float onX = an.x >= max(an.y, an.z) ? 1.0 : 0.0;
+  float onZ = an.z > max(an.x, an.y) ? 1.0 : 0.0;
+  float cx = floor(onX > 0.5 ? p.y : p.x);
+  float cy = floor(onZ > 0.5 ? p.y : p.z);
+
+  // 4 x 4 ordered dither threshold for this cell, centered on zero (-0.47 to 0.47)
+  float b = 4.0 * bayer2(mod(cx, 2.0), mod(cy, 2.0)) + bayer2(mod(floor(cx / 2.0), 2.0), mod(floor(cy / 2.0), 2.0));
+  float d = ((b + 0.5) / 16.0 - 0.5) * dither * (is32 > 0.5 ? 0.35 : 1.0);
+
+  // stepped light: 3 tones at 8 bit, 5 at 16, 8 at 32
+  float l = saturate((dot(normal, light_dir) + wrap) / (1.0 + wrap));
+  float tones = is8 > 0.5 ? 3.0 : (is32 > 0.5 ? 8.0 : 5.0);
+  float t = saturate(floor(l * (tones - 1.0) + 0.5 + d) / (tones - 1.0));
+  vec3 c = t < 0.5 ? mix(shadow, base, t * 2.0) : mix(base, light, t * 2.0 - 1.0);
+  c = c * light_color;
+
+  // the color depth itself: 3-3-2 bits (8 bit), 5-6-5 (16 bit), 8-8-8 (32 bit), dithered lightly
+  vec3 n = is8 > 0.5 ? vec3(8.0, 8.0, 4.0) : (is32 > 0.5 ? vec3(256.0, 256.0, 256.0) : vec3(32.0, 64.0, 32.0));
+  color = levels(c, n, d * 0.25);
+}

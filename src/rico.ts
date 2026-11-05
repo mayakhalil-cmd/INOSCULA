@@ -1,4 +1,4 @@
-// RICO Engine adapter. RICO renders with three.js, so a Inoscula graph becomes a live ShaderMaterial:
+// RICO Engine adapter. RICO renders with three.js, so an Inoscula graph becomes a live ShaderMaterial:
 //   const look = inosculaMaterial(THREE, graph)
 //   mesh.material = look.material
 //   every frame: look.tick(seconds, sunLight)       // keeps time and the lighting contract live
@@ -14,7 +14,8 @@ export function inosculaMaterial(THREE: any, graph: Graph, opts: ThreeOpts & { t
   const ir = check(graph)
   const sh = toThree(ir, opts)
   const uniforms: Record<string, { value: any }> = {}
-  for (const [k, v] of Object.entries(sh.uniforms)) uniforms[k] = { value: Array.isArray(v) ? new THREE.Vector3(...v) : v }
+  for (const [k, v] of Object.entries(sh.uniforms)) uniforms[k] = { value: Array.isArray(v) ? (v.length === 2 ? new THREE.Vector2(...v) : new THREE.Vector3(...v)) : v }
+  if (ir.glass) uniforms.inoscula_behind = { value: null }
   let material: any
   if (sh.lit) {
     // lit: three's own physical material does the lighting, shadows, environment and tonemapping
@@ -40,7 +41,7 @@ export function inosculaMaterial(THREE: any, graph: Graph, opts: ThreeOpts & { t
       vertexColors: sh.vertexColors,
       transparent: opts.transparent ?? (Boolean(ir.alpha) && !ir.cutout),
       side: ir.cutout ? THREE.DoubleSide : THREE.FrontSide,
-      toneMapped: false, // unlit: the colour is shown exactly as the shader writes it
+      toneMapped: false, // unlit: the color is shown exactly as the shader writes it
     })
   }
   // outline: a second, inside-out copy of each mesh pushed out along its normals, sharing the same parameters
@@ -51,6 +52,7 @@ export function inosculaMaterial(THREE: any, graph: Graph, opts: ThreeOpts & { t
     outlineMaterial = new THREE.ShaderMaterial({ vertexShader: sh.outline.vertexShader, fragmentShader: sh.outline.fragmentShader, uniforms: u, side: THREE.BackSide, toneMapped: false })
   }
   const dir = new THREE.Vector3()
+  let behind: any = null
   return {
     material,
     outlineMaterial,
@@ -122,6 +124,25 @@ export function inosculaMaterial(THREE: any, graph: Graph, opts: ThreeOpts & { t
       }
       return made
     },
+    /** Glass looks only: draws the scene without the objects wearing this look into a texture, which the glass
+     *  then bends. Call once a frame, just before renderer.render(scene, camera). Does nothing for other looks. */
+    renderBehind(renderer: any, scene: any, camera: any) {
+      if (!ir.glass) return
+      const size = renderer.getDrawingBufferSize(new THREE.Vector2())
+      if (!behind || behind.width !== size.x || behind.height !== size.y) {
+        behind?.dispose()
+        behind = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 })
+      }
+      const hidden: any[] = []
+      scene.traverse((m: any) => { if (m.visible && m.isMesh && (m.material === material || m.material === outlineMaterial)) { m.visible = false; hidden.push(m) } })
+      const was = renderer.getRenderTarget()
+      renderer.setRenderTarget(behind)
+      renderer.render(scene, camera)
+      renderer.setRenderTarget(was)
+      for (const m of hidden) m.visible = true
+      uniforms.inoscula_behind.value = behind.texture
+      uniforms.inoscula_screen_inv.value.set(1 / size.x, 1 / size.y)
+    },
     params: ir.params,
     /** Set a parameter by id. Numbers for float parameters, [x, y, z] or [r, g, b] (linear) for the rest. */
     set(id: string, v: number | V3) {
@@ -131,7 +152,7 @@ export function inosculaMaterial(THREE: any, graph: Graph, opts: ThreeOpts & { t
       else u.value = v
       return true
     },
-    /** Call once a frame. light: any three DirectionalLight; its direction and colour feed the lighting contract. */
+    /** Call once a frame. light: any three DirectionalLight; its direction and color feed the lighting contract. */
     tick(seconds: number, light?: any) {
       uniforms.inoscula_time.value = seconds
       if (light) {
@@ -142,6 +163,6 @@ export function inosculaMaterial(THREE: any, graph: Graph, opts: ThreeOpts & { t
         uniforms.inoscula_light_color.value.set(light.color.r, light.color.g, light.color.b)
       }
     },
-    dispose() { material.dispose() },
+    dispose() { material.dispose(); behind?.dispose() },
   }
 }
