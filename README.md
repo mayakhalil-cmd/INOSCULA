@@ -168,6 +168,8 @@ the original model.
 4. For looks that use the light direction, add a Sun light and rename it `RICO Sun`.
 5. For brush cards or shells, keep the model selected and run `importers/inoscula_cards_blender.py` or
    `importers/inoscula_shells_blender.py` the same way.
+6. Glass looks (Hard Reflections) show what is behind the object, so put something behind it. In Cycles the
+   viewport starts grainy and clears up as it renders more samples.
 
 **Godot (4.4 or later)**
 

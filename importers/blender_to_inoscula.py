@@ -344,6 +344,10 @@ def surface_color(imp, mat):
             return col, None
         if t == "ShaderNodeMixShader":
             a, b = nd.inputs[1], nd.inputs[2]
+            # glass: the inside of the object let straight through (Backfacing picks a Transparent BSDF)
+            fac = nd.inputs[0]
+            if fac.is_linked and fac.links[0].from_node.bl_idname == "ShaderNodeNewGeometry" and fac.links[0].from_socket.name == "Backfacing" and a.is_linked:
+                return shader(a.links[0].from_socket)
             # glass: the surface mixed with refraction by the group's Glass output, its IOR and dispersion
             # read back from what the group's Glass IOR and Glass Dispersion outputs feed
             if a.is_linked and b.is_linked and b.links[0].from_node.bl_idname in ("ShaderNodeBsdfRefraction", "ShaderNodeAddShader"):

@@ -3598,18 +3598,21 @@ for o in bpy.data.objects:
 // Glass: the surface mixed with refraction by the glass amount. Three Refraction BSDFs, tinted red, green and blue,
 // each with its IOR spread by the dispersion the same way the other tools spread their offsets, add up to white
 // glass that splits at the edges. Cycles refracts as it is; Eevee needs raytraced refraction, turned on below.
+// The other tools shift the picture behind by (IOR - 1) * 0.2, so Blender bends with 1 + (IOR - 1) * 0.2 and
+// lets the far side of the object through. Real IOR 1.45 through a solid ball turns the picture upside down.
 const BLENDER_GLASS = `# ---- glass: refraction behind the surface, split into red, green and blue by the dispersion
 srf = out.inputs["Surface"].links[0].from_socket
 g_mx = nt.nodes.new("ShaderNodeMixShader")
 g_mx.location = (900, 0)
-out.location = (1100, 0)
 nt.links.new(gn.outputs["Glass"], g_mx.inputs[0])
 nt.links.new(srf, g_mx.inputs[1])
+BEND = 0.2  # the same strength as the other tools
 g_less = nt.nodes.new("ShaderNodeMath")
-g_less.operation = "SUBTRACT"
+g_less.operation = "MULTIPLY_ADD"
 g_less.location = (300, -500)
 nt.links.new(gn.outputs["Glass IOR"], g_less.inputs[0])
-g_less.inputs[1].default_value = 1.0
+g_less.inputs[1].default_value = BEND
+g_less.inputs[2].default_value = -BEND
 g_sum = None
 for i, tint in enumerate(((1.0, 0.0, 0.0, 1.0), (0.0, 1.0, 0.0, 1.0), (0.0, 0.0, 1.0, 1.0))):
     k = nt.nodes.new("ShaderNodeMath")
@@ -3638,7 +3641,25 @@ for i, tint in enumerate(((1.0, 0.0, 0.0, 1.0), (0.0, 1.0, 0.0, 1.0), (0.0, 0.0,
         nt.links.new(rf.outputs[0], ad.inputs[1])
         g_sum = ad.outputs[0]
 nt.links.new(g_sum, g_mx.inputs[2])
-nt.links.new(g_mx.outputs[0], out.inputs["Surface"])
+# the inside of the object is let straight through, so the glass shows what is behind the object and not its own
+# far side, the same as the other tools
+g_geo = nt.nodes.new("ShaderNodeNewGeometry")
+g_geo.location = (900, -250)
+g_clear = nt.nodes.new("ShaderNodeBsdfTransparent")
+g_clear.location = (900, -400)
+g_back = nt.nodes.new("ShaderNodeMixShader")
+g_back.location = (1100, 0)
+out.location = (1300, 0)
+nt.links.new(g_geo.outputs["Backfacing"], g_back.inputs[0])
+nt.links.new(g_mx.outputs[0], g_back.inputs[1])
+nt.links.new(g_clear.outputs[0], g_back.inputs[2])
+nt.links.new(g_back.outputs[0], out.inputs["Surface"])
+# Eevee: a thickness of zero means one surface to bend through, as in Cycles above (Blender 4.2 and later)
+if "Thickness" in out.inputs:
+    g_thin = nt.nodes.new("ShaderNodeValue")
+    g_thin.location = (1100, -200)
+    g_thin.outputs[0].default_value = 0.0
+    nt.links.new(g_thin.outputs[0], out.inputs["Thickness"])
 # Eevee only refracts other objects with raytraced refraction on (Blender 4.2 and later), or screen space
 # refraction (earlier versions)
 for attr in ("use_raytrace_refraction", "use_screen_refraction"):
