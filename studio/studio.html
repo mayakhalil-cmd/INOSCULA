@@ -757,7 +757,7 @@ src.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveSource() }
 })
 let timer = 0
-src.addEventListener('input', () => { pickLine = 0; paint(); clearTimeout(timer); timer = setTimeout(compile, 220); store.set('inoscula-draft', src.value) })
+src.addEventListener('input', () => { pickLine = 0; paint(); clearTimeout(timer); timer = setTimeout(compile, ir && ir.steps.length > PREVIEW_LIMIT ? 900 : 220); store.set('inoscula-draft', src.value) })
 function goToLine(n) {
   const lines = src.value.split('\n')
   let pos = 0
@@ -1326,9 +1326,15 @@ function readyStatus() {
   const from = foreign() ? ` Read as ${esc(reading.style ? styleName(reading.style) : reading.language.toUpperCase())} code. <button class="chip" type="button" id="toIno" title="Replace the code in the editor with the same shader written as Inoscula code">Turn into Inoscula code</button>` : ''
   const note = (w) => `<div class="note">${w.line ? `<button class="chip" type="button" data-line="${w.line}">Line ${w.line}</button> ` : ''}${esc(w.msg)}</div>`
   const list = !notes.length ? '' : notes.length === 1 ? note(notes[0]) : `<details class="notes"><summary>${notes.length} notes about this shader</summary>${notes.map(note).join('')}</details>`
-  status.innerHTML = `<b>Ready.</b> ${esc(ir.name)}: ${ir.steps.length} nodes, ${ir.params.length} parameter${ir.params.length === 1 ? '' : 's'}, ${lt}.${from}${previewError ? ` <span style="color: var(--pink)">The preview could not draw it: ${esc(previewError)}</span>` : ''}${list}`
+  const key = material?.userData.inosculaKey, why = material?.userData.inosculaHeld || (key && stoppedShaders.has(key) ? 'stopped' : '')
+  const held = !why ? '' : `<div class="note" style="color: var(--pink)">${why === 'big'
+    ? `The preview is paused for this shader, so the object shows plain gray. It became ${ir.steps.length.toLocaleString('en-US')} nodes, and a shader that big can keep the graphics card busy so long that the browser stops the preview, which leaves a white screen with a sad face. Loops are written out as nodes one round at a time, so lowering loop counts such as MAX_STEPS makes it much smaller. Exporting is slow at this size too. Blender needs minutes to build a shader of a few thousand nodes, so lower the loop counts before you export.`
+    : `The graphics card stopped while drawing this shader, so the object shows plain gray instead. Lowering loop counts such as MAX_STEPS makes it smaller. If the whole preview stays white with a sad face, the browser has turned off 3D for this page. Press F5 to reload it, and the code in the editor is kept.`} <button class="chip" type="button" id="previewAnyway">${why === 'big' ? 'Preview anyway' : 'Try again'}</button></div>`
+  status.innerHTML = `<b>Ready.</b> ${esc(ir.name)}: ${ir.steps.length.toLocaleString('en-US')} nodes, ${ir.params.length} parameter${ir.params.length === 1 ? '' : 's'}, ${lt}.${from}${previewError ? ` <span style="color: var(--pink)">The preview could not draw it: ${esc(previewError)}</span>` : ''}${held ? ' ' + held : ''}${list}`
   status.title = status.textContent
+  if (held) status.className = 'status ok wrap'
   $('toIno')?.addEventListener('click', toInoscula)
+  $('previewAnyway')?.addEventListener('click', () => { previewAnyway.add(key); stoppedShaders.delete(key); keepStopped(); buildMaterial(); readyStatus() })
   for (const b of status.querySelectorAll('[data-line]')) b.addEventListener('click', () => goToLine(+b.dataset.line))
 }
 // the shader read from GLSL or HLSL, written out as Inoscula code so every Studio tool can edit it
@@ -1346,9 +1352,22 @@ renderer.debug.onShaderError = (gl, program, vs, fs) => {
   console.warn('Inoscula preview shader:', log)
   if (ir) readyStatus()
 }
+// Shaders read from GLSL can become tens of thousands of nodes (every round of a loop is written out). The graphics
+// card may need so long for one of those that the browser stops it: the canvas goes white with a sad face, and
+// three.js compiles the same shader again when the canvas comes back, which stops it again. So a shader over this
+// size waits for "Preview anyway", and one that stopped the card is not drawn again until "Try again". The largest
+// look is under 700 nodes and the largest Shadertoy test shader under 3,000.
+const PREVIEW_LIMIT = 6000
+const previewAnyway = new Set()
+const stoppedShaders = new Set((store.get('inoscula-gpu-stopped') || '').split(' ').filter(Boolean))
+const keepStopped = () => store.set('inoscula-gpu-stopped', [...stoppedShaders].slice(-20).join(' '))
+function textKey(t) { let h = 0x811c9dc5; for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 0x01000193); return (h >>> 0).toString(36) + t.length.toString(36) }
+const standIn = (key, why, nodes) => { const m = new THREE.MeshStandardMaterial({ color: 0x8a8a8a, roughness: 0.85 }); m.userData = { inosculaKey: key, inosculaHeld: why, nodes }; return m }
 function buildMaterial() {
   previewError = ''
   const sh = toThree(ir)
+  const key = textKey(sh.fragmentShader + sh.vertexColors)
+  const why = stoppedShaders.has(key) ? 'stopped' : ir.steps.length > PREVIEW_LIMIT && !previewAnyway.has(key) ? 'big' : ''
   uniforms = {}
   for (const [k, v] of Object.entries(sh.uniforms)) uniforms[k] = { value: Array.isArray(v) ? (v.length === 2 ? new THREE.Vector2(...v) : new THREE.Vector3(...v)) : v }
   if (ir.glass) uniforms.inoscula_behind = { value: null }
@@ -1366,9 +1385,10 @@ function buildMaterial() {
   } else {
     m = new THREE.ShaderMaterial({ vertexShader: sh.vertexShader, fragmentShader: sh.fragmentShader, uniforms, transparent: Boolean(ir.alpha) && !ir.cutout, side: ir.cutout ? THREE.DoubleSide : THREE.FrontSide, vertexColors: sh.vertexColors })
   }
+  if (why) { m.dispose(); m = standIn(key, why, ir.steps.length); toast(why === 'big' ? 'This shader is too big to preview safely, so the object shows plain gray. The note under the code explains why.' : 'This shader stopped the graphics card before, so the object shows plain gray. The note under the code has a Try again button.') } else m.userData = { inosculaKey: key, nodes: ir.steps.length }
   material?.dispose(); material = m; unlitToneMap()
   outlineMat?.dispose(); outlineMat = null
-  if (sh.outline) {
+  if (sh.outline && !why) {
     const ou = {}
     for (const [k, from] of Object.entries(sh.outline.uniforms)) ou[k] = uniforms[from]
     outlineMat = new THREE.ShaderMaterial({ vertexShader: sh.outline.vertexShader, fragmentShader: sh.outline.fragmentShader, uniforms: ou, side: THREE.BackSide, toneMapped: false })
@@ -1379,14 +1399,14 @@ function buildMaterial() {
 // Big shaders (the painterly looks have hundreds of nodes) can take seconds to compile. Compile them in the
 // background (parallel shader compile where the browser has it) and keep the page responsive meanwhile: the
 // preview pauses with a note instead of freezing the whole page.
-let compiling = false, compileTicket = 0
+let compiling = false, compileTicket = 0, compilingKey = null
 async function compileInBackground() {
   const ticket = ++compileTicket
-  compiling = true; busy(true, 'Compiling shader…')
+  compiling = true; compilingKey = material?.userData.inosculaKey; busy(true, 'Compiling shader…')
   await new Promise((r) => setTimeout(r, 30))
   try { await compileScene() } catch (e) { console.warn(e) }
   if (ticket !== compileTicket) return
-  compiling = false; busy(false)
+  compiling = false; compilingKey = null; busy(false)
   frameAvg = 16
 }
 // renderer.compileAsync waits on every material it started, and throws from a timer when one of them is replaced
@@ -1395,6 +1415,7 @@ function compileScene() {
   const pending = renderer.compile(scene, cam)
   return new Promise((resolve) => {
     const tick = () => {
+      if (renderer.getContext().isContextLost()) { resolve(); return }
       for (const m of pending) {
         const prog = renderer.properties.get(m)?.currentProgram
         if (!prog || prog.isReady()) pending.delete(m)
@@ -1405,6 +1426,26 @@ function compileScene() {
     tick()
   })
 }
+// When the graphics card stops, the shader it was compiling, or else the biggest one in the scene, is set aside
+// so the preview can come back without it.
+canvas.addEventListener('webglcontextlost', () => {
+  let key = compilingKey, most = -1
+  if (!key) scene.traverse((o) => { const d = o.isMesh && o.material?.userData; if (d?.inosculaKey && !d.inosculaHeld && d.nodes > most) { most = d.nodes; key = d.inosculaKey } })
+  if (key) { stoppedShaders.add(key); keepStopped() }
+  compileTicket++; compiling = false; compilingKey = null; busy(false)
+  if (ir) readyStatus()
+})
+canvas.addEventListener('webglcontextrestored', () => {
+  for (const o of objects) {
+    if (o === active) continue
+    const d = o.material?.userData
+    if (!d?.inosculaKey || d.inosculaHeld || !stoppedShaders.has(d.inosculaKey)) continue
+    const m = standIn(d.inosculaKey, 'stopped', d.nodes), old = o.material
+    o.group.traverse((x) => { if (x.isMesh && x.material === old) x.material = m })
+    o.material = m; old.dispose()
+  }
+  if (ir) { buildMaterial(); readyStatus() }
+})
 // unlit colors pass through the tonemapper only where that program does it by default (Blender, Unreal)
 function unlitToneMap() { if (material && !material.isMeshPhysicalMaterial) material.toneMapped = profileKey === 'blender' || profileKey === 'unreal' }
 function setUniform(id, v) {

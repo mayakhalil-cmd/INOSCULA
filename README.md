@@ -104,6 +104,12 @@ A pasted shader cannot do these yet.
 - **Vertex shaders.** Only the pixel part (the fragment shader) turns into nodes.
 - **Endless loops.** A loop with a fixed count runs in full, but one that only stops on a condition (a `while`
   loop, or a `for` with no fixed end) runs up to 128 steps, then stops there with a note.
+- **Very big shaders.** Every round of a loop becomes its own copy of the nodes inside it, so a ray marcher with
+  `MAX_STEPS 110` can turn into tens of thousands of nodes. Above 6,000 nodes the preview pauses and shows the
+  object in plain gray, with a **Preview anyway** button. A shader that big can keep the graphics card busy so long
+  that the browser stops the preview, which leaves a white screen with a sad face. If that happens, the shader is
+  set aside so the preview comes back, and **Try again** draws it once more. Exporting is slow at this size too
+  (Blender took almost 2 minutes to build a 3,757-node shader in a test), so lower the loop counts first.
 - **Random numbers made with** `fract(sin(x) * 43758.5)`. They turn into nodes fine, but that trick rounds
   differently on each graphics card, so Blender shows a different random pattern while the look stays the same.
   Use `white_noise(p)` in its place for a pattern that matches everywhere. The note says which line.
